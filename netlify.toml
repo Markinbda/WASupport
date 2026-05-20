@@ -1,0 +1,33 @@
+[build]
+  base = "."
+  command = "pnpm install --frozen-lockfile=false && pnpm --filter @academydesk/web build"
+  publish = "apps/web/dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+  PNPM_VERSION = "9"
+  NPM_FLAGS = "--version"   # prevent npm install; we use pnpm
+
+[functions]
+  node_bundler = "esbuild"
+  directory = "netlify/functions"
+
+# SPA fallback so React Router works
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Friendly URLs for functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[dev]
+  command = "pnpm --filter @academydesk/web dev"
+  targetPort = 5173
+  port = 8888
+  framework = "#custom"
+  publish = "apps/web/dist"

@@ -1,0 +1,54 @@
+# Supabase config for AcademyDesk
+project_id = "academydesk"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:8888"
+additional_redirect_urls = ["http://localhost:5173", "http://localhost:8888"]
+jwt_expiry = 3600
+enable_signup = false  # invite-only school environment
+
+[auth.email]
+enable_signup = false
+enable_confirmations = true
+
+# Microsoft Entra SSO — fill in once tenant info is available
+[auth.external.azure]
+enabled = false
+client_id = "env(AZURE_CLIENT_ID)"
+secret = "env(AZURE_CLIENT_SECRET)"
+url = "https://login.microsoftonline.com/env(AZURE_TENANT_ID)/v2.0"
+
+[edge_runtime]
+enabled = true
+inspector_port = 8083

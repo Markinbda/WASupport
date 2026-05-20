@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "supabase.vscode-supabase-extension",
+    "netlify.netlify-vscode",
+    "github.vscode-github-actions",
+    "ms-vscode.vscode-speech"
+  ]
+}
