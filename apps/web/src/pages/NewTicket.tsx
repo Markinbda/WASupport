@@ -6,11 +6,9 @@ import { useAuth } from '../lib/auth';
 import { Combobox } from '../components/Combobox';
 import {
   DEPARTMENT_LABEL,
-  PRIORITY_LABEL,
   type Category,
   type Department,
   type Location,
-  type TicketPriority,
 } from '../lib/types';
 
 export default function NewTicket() {
@@ -21,7 +19,6 @@ export default function NewTicket() {
   const [department, setDepartment] = useState<Department>('IT');
   const [categoryId, setCategoryId] = useState<string>('');
   const [locationId, setLocationId] = useState<string>('');
-  const [priority, setPriority] = useState<TicketPriority>('normal');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +60,6 @@ export default function NewTicket() {
           department,
           category_id: categoryId || null,
           location_id: locationId || null,
-          priority,
           subject,
           description,
           submitter_id: user.id,
@@ -87,8 +83,7 @@ export default function NewTicket() {
     <section className="mx-auto max-w-2xl">
       <h1 className="page-title">Submit a ticket</h1>
       <p className="page-subtitle">
-        Phase 3 will route this through the AI assistant first. For now it goes straight into the
-        queue.
+        A team member will review your request and assign a priority and owner shortly.
       </p>
 
       <form
@@ -116,24 +111,6 @@ export default function NewTicket() {
               {(Object.keys(DEPARTMENT_LABEL) as Department[]).map((d) => (
                 <option key={d} value={d}>
                   {DEPARTMENT_LABEL[d]}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="priority" className="field-label">
-              Priority
-            </label>
-            <select
-              id="priority"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as TicketPriority)}
-              className="field-select"
-            >
-              {(Object.keys(PRIORITY_LABEL) as TicketPriority[]).map((p) => (
-                <option key={p} value={p}>
-                  {PRIORITY_LABEL[p]}
                 </option>
               ))}
             </select>

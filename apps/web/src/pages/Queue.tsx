@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
+import SlaBadge from '../components/SlaBadge';
 import {
   DEPARTMENT_LABEL,
   PRIORITY_BADGE,
@@ -94,6 +95,7 @@ export default function Queue() {
             className="field-select-sm"
           >
             <option value="ALL">All statuses</option>
+            <option value="awaiting_triage">Needs triage</option>
             <option value="open">Open</option>
             <option value="in_progress">In progress</option>
             <option value="on_hold">On hold</option>
@@ -129,6 +131,7 @@ export default function Queue() {
                 <th>Dept</th>
                 <th>Priority</th>
                 <th>Status</th>
+                <th>SLA</th>
                 <th>Submitter</th>
                 <th>Created</th>
               </tr>
@@ -153,6 +156,9 @@ export default function Queue() {
                   </td>
                   <td>
                     <span className={STATUS_BADGE[t.status]}>{STATUS_LABEL[t.status]}</span>
+                  </td>
+                  <td>
+                    <SlaBadge slaDueAt={t.sla_due_at} status={t.status} />
                   </td>
                   <td className="text-xs text-slate-600">{t.legacy_submitter_name ?? '—'}</td>
                   <td className="text-xs text-slate-500">

@@ -1,7 +1,13 @@
 /** Database row types — replace with `supabase gen types` output in Phase 2. */
 
 export type Department = 'IT' | 'FAC' | 'HS';
-export type TicketStatus = 'open' | 'in_progress' | 'on_hold' | 'resolved' | 'closed';
+export type TicketStatus =
+  | 'awaiting_triage'
+  | 'open'
+  | 'in_progress'
+  | 'on_hold'
+  | 'resolved'
+  | 'closed';
 export type TicketPriority = 'low' | 'normal' | 'high' | 'critical' | 'urgent';
 export type UserRole =
   | 'submitter'
@@ -38,6 +44,11 @@ export interface Ticket {
   updated_at: string;
   resolved_at: string | null;
   closed_at: string | null;
+  triaged_at: string | null;
+  triaged_by: string | null;
+  sla_due_at: string | null;
+  sla_reminder_approaching_sent: boolean;
+  sla_reminder_overdue_sent: boolean;
   legacy_ref: string | null;
   legacy_submitter_name: string | null;
   legacy_assignee_name: string | null;
@@ -87,6 +98,7 @@ export const PRIORITY_LABEL: Record<TicketPriority, string> = {
 };
 
 export const STATUS_LABEL: Record<TicketStatus, string> = {
+  awaiting_triage: 'Awaiting triage',
   open: 'Open',
   in_progress: 'In progress',
   on_hold: 'On hold',
@@ -106,6 +118,7 @@ export const ROLE_LABEL: Record<UserRole, string> = {
 };
 
 export const STATUS_BADGE: Record<TicketStatus, string> = {
+  awaiting_triage: 'badge-triage',
   open: 'badge-open',
   in_progress: 'badge-progress',
   on_hold: 'badge-hold',

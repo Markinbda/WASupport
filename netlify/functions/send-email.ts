@@ -73,6 +73,8 @@ type Ticket = {
   priority: string;
   status: string;
   submitter_id: string | null;
+  assignee_id: string | null;
+  sla_due_at: string | null;
   legacy_submitter_email: string | null;
   legacy_submitter_name: string | null;
 };
@@ -86,6 +88,7 @@ type Message = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
+  awaiting_triage: 'Awaiting triage',
   open: 'Open',
   in_progress: 'In progress',
   on_hold: 'On hold',
@@ -320,44 +323,96 @@ export const handler: Handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ ok: true }) };
     }
 
-    // --- ticket status changed ------------------------------------------
+    // --- ticket status / assignee changed -------------------------------
     if (payload.table === 'tickets' && payload.type === 'UPDATE') {
       const t = payload.record as unknown as Ticket;
       const old = payload.old_record as unknown as Ticket | null;
-      if (!old || old.status === t.status) {
-        return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: 'no status change' }) };
+      if (!old) {
+        return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: 'no old record' }) };
       }
 
-      const submitterEmail = await resolveEmail(t.submitter_id, t.legacy_submitter_email);
-      if (!submitterEmail) {
-        await logNotification({
-          ticket_id: t.id,
-          event: 'ticket.status_changed',
-          recipients: [],
-          status: 'skipped',
-          error: 'no submitter email',
-        });
-        return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: 'no submitter' }) };
+      const statusChanged = old.status !== t.status;
+      const assigneeChanged = (old.assignee_id ?? null) !== (t.assignee_id ?? null) && !!t.assignee_id;
+      let didSomething = false;
+
+      // Notify the new assignee
+      if (assigneeChanged && t.assignee_id) {
+        const assigneeEmail = await resolveEmail(t.assignee_id);
+        if (assigneeEmail) {
+          const dueLine = t.sla_due_at
+            ? `SLA due: ${new Date(t.sla_due_at).toLocaleString()}`
+            : '';
+          const tpl = renderTemplate({
+            title: `Assigned to you: ${t.ref}`,
+            intro: `You've been assigned this ${DEPT_LABEL[t.department] ?? t.department} ticket.${dueLine ? ' ' + dueLine : ''}`,
+            ticket: t,
+            bodyBlock: t.description,
+            appUrl,
+          });
+          const result = await sendgridSend({
+            to: [assigneeEmail],
+            subject: `[${t.ref}] Assigned to you`,
+            ...tpl,
+          });
+          await logNotification({
+            ticket_id: t.id,
+            event: 'ticket.assigned',
+            recipients: [assigneeEmail],
+            status: result.skipped ? 'skipped' : 'sent',
+          });
+          didSomething = true;
+        } else {
+          await logNotification({
+            ticket_id: t.id,
+            event: 'ticket.assigned',
+            recipients: [],
+            status: 'skipped',
+            error: 'no assignee email',
+          });
+        }
       }
 
-      const tpl = renderTemplate({
-        title: `Status updated: ${STATUS_LABEL[t.status] ?? t.status}`,
-        intro: `Your ticket has moved from "${STATUS_LABEL[old.status] ?? old.status}" to "${STATUS_LABEL[t.status] ?? t.status}".`,
-        ticket: t,
-        appUrl,
-      });
-      const result = await sendgridSend({
-        to: [submitterEmail],
-        subject: `[${t.ref}] Status: ${STATUS_LABEL[t.status] ?? t.status}`,
-        ...tpl,
-      });
-      await logNotification({
-        ticket_id: t.id,
-        event: 'ticket.status_changed',
-        recipients: [submitterEmail],
-        status: result.skipped ? 'skipped' : 'sent',
-      });
-      return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+      // Notify the submitter of a status change (skip the silent
+      // awaiting_triage → open/in_progress transition triggered by triage:
+      // the assignee notification above is the meaningful event).
+      const isTriageTransition =
+        old.status === 'awaiting_triage' && t.status !== 'awaiting_triage';
+      if (statusChanged && !isTriageTransition) {
+        const submitterEmail = await resolveEmail(t.submitter_id, t.legacy_submitter_email);
+        if (submitterEmail) {
+          const tpl = renderTemplate({
+            title: `Status updated: ${STATUS_LABEL[t.status] ?? t.status}`,
+            intro: `Your ticket has moved from "${STATUS_LABEL[old.status] ?? old.status}" to "${STATUS_LABEL[t.status] ?? t.status}".`,
+            ticket: t,
+            appUrl,
+          });
+          const result = await sendgridSend({
+            to: [submitterEmail],
+            subject: `[${t.ref}] Status: ${STATUS_LABEL[t.status] ?? t.status}`,
+            ...tpl,
+          });
+          await logNotification({
+            ticket_id: t.id,
+            event: 'ticket.status_changed',
+            recipients: [submitterEmail],
+            status: result.skipped ? 'skipped' : 'sent',
+          });
+          didSomething = true;
+        } else {
+          await logNotification({
+            ticket_id: t.id,
+            event: 'ticket.status_changed',
+            recipients: [],
+            status: 'skipped',
+            error: 'no submitter email',
+          });
+        }
+      }
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ ok: true, skipped: didSomething ? undefined : 'no actionable change' }),
+      };
     }
 
     // --- new message (reply) --------------------------------------------

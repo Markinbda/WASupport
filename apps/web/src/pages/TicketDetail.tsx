@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
+import SlaBadge from '../components/SlaBadge';
 import {
   DEPARTMENT_LABEL,
   PRIORITY_BADGE,
@@ -11,8 +12,25 @@ import {
   STATUS_LABEL,
   type Ticket,
   type TicketMessage,
+  type TicketPriority,
   type TicketStatus,
 } from '../lib/types';
+
+type AssigneeOption = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string;
+  department: string | null;
+};
+
+const PRIORITY_SLA_HINT: Record<TicketPriority, string> = {
+  urgent: 'Urgent — 4 hours',
+  critical: 'Critical — 4 hours',
+  high: 'High — same day (8h)',
+  normal: 'Normal — 48 hours',
+  low: 'Low — 1 week',
+};
 
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +39,8 @@ export default function TicketDetail() {
   const [reply, setReply] = useState('');
   const [internal, setInternal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [triagePriority, setTriagePriority] = useState<TicketPriority>('normal');
+  const [triageAssignee, setTriageAssignee] = useState<string>('');
 
   const ticketQ = useQuery({
     queryKey: ['ticket', id],
@@ -80,11 +100,85 @@ export default function TicketDetail() {
     onError: (e: Error) => setError(e.message),
   });
 
+  // Eligible assignees: dept tech matching ticket dept, plus managers/admins.
+  const t0 = ticketQ.data;
+  const assigneesQ = useQuery({
+    queryKey: ['assignees', t0?.department],
+    enabled: !!supabase && !!t0 && isStaff,
+    queryFn: async (): Promise<AssigneeOption[]> => {
+      if (!supabase || !t0) return [];
+      const deptRoleMap: Record<string, string> = {
+        IT: 'it_tech',
+        FAC: 'fac_tech',
+        HS: 'hs_officer',
+      };
+      const techRole = deptRoleMap[t0.department];
+      const roles = ['manager', 'admin'];
+      if (techRole) roles.push(techRole);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role, department')
+        .in('role', roles)
+        .order('full_name', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as AssigneeOption[];
+    },
+  });
+
+  const assigneeProfileQ = useQuery({
+    queryKey: ['profile', t0?.assignee_id],
+    enabled: !!supabase && !!t0?.assignee_id,
+    queryFn: async (): Promise<AssigneeOption | null> => {
+      if (!supabase || !t0?.assignee_id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role, department')
+        .eq('id', t0.assignee_id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as AssigneeOption | null;
+    },
+  });
+
+  const triage = useMutation({
+    mutationFn: async () => {
+      if (!supabase || !id || !user) throw new Error('not ready');
+      if (!triageAssignee) throw new Error('Pick an assignee');
+      const { error } = await supabase
+        .from('tickets')
+        .update({
+          priority: triagePriority,
+          assignee_id: triageAssignee,
+          triaged_by: user.id,
+          status: 'in_progress',
+        })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ticket', id] }),
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const reassign = useMutation({
+    mutationFn: async (newAssignee: string) => {
+      if (!supabase || !id) throw new Error('not ready');
+      const { error } = await supabase
+        .from('tickets')
+        .update({ assignee_id: newAssignee || null })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ticket', id] }),
+    onError: (e: Error) => setError(e.message),
+  });
+
   if (ticketQ.isLoading) return <p className="text-sm text-slate-500">Loading…</p>;
   if (ticketQ.error)
     return <p className="alert-error">{(ticketQ.error as Error).message}</p>;
 
   const t = ticketQ.data!;
+  const assigneeName =
+    assigneeProfileQ.data?.full_name || assigneeProfileQ.data?.email || null;
 
   const allStatuses: TicketStatus[] = ['open', 'in_progress', 'on_hold', 'resolved', 'closed'];
   const supportStatuses: TicketStatus[] = ['resolved', 'closed'];
@@ -113,6 +207,7 @@ export default function TicketDetail() {
           <span className="badge-slate">{DEPARTMENT_LABEL[t.department]}</span>
           <span className={PRIORITY_BADGE[t.priority]}>{PRIORITY_LABEL[t.priority]}</span>
           <span className={STATUS_BADGE[t.status]}>{STATUS_LABEL[t.status]}</span>
+          <SlaBadge slaDueAt={t.sla_due_at} status={t.status} />
         </div>
 
         <h1 className="text-2xl font-bold text-brand-navy">{t.subject}</h1>
@@ -155,7 +250,95 @@ export default function TicketDetail() {
               <dd className="mt-1 text-slate-700">imported from {t.imported_from}</dd>
             </div>
           )}
+          {assigneeName && (
+            <div>
+              <dt className="section-title">Assignee</dt>
+              <dd className="mt-1 text-slate-700">{assigneeName}</dd>
+            </div>
+          )}
+          {t.sla_due_at && t.status !== 'awaiting_triage' && (
+            <div>
+              <dt className="section-title">SLA due</dt>
+              <dd className="mt-1 text-slate-700">
+                {new Date(t.sla_due_at).toLocaleString()}
+              </dd>
+            </div>
+          )}
         </dl>
+
+        {isStaff && t.status === 'awaiting_triage' && (
+          <div className="mt-6 rounded-lg border border-rose-200 bg-rose-50 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="badge-triage">Needs triage</span>
+              <p className="text-sm text-rose-900">
+                Set a priority and assign someone to start the SLA clock.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="field-label">Priority</span>
+                <select
+                  className="field-select"
+                  value={triagePriority}
+                  onChange={(e) => setTriagePriority(e.target.value as TicketPriority)}
+                >
+                  <option value="low">{PRIORITY_SLA_HINT.low}</option>
+                  <option value="normal">{PRIORITY_SLA_HINT.normal}</option>
+                  <option value="high">{PRIORITY_SLA_HINT.high}</option>
+                  <option value="critical">{PRIORITY_SLA_HINT.critical}</option>
+                  <option value="urgent">{PRIORITY_SLA_HINT.urgent}</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="field-label">Assignee</span>
+                <select
+                  className="field-select"
+                  value={triageAssignee}
+                  onChange={(e) => setTriageAssignee(e.target.value)}
+                >
+                  <option value="">Select…</option>
+                  {(assigneesQ.data ?? []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.full_name || p.email || p.id} ({p.role})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                disabled={!triageAssignee || triage.isPending}
+                onClick={() => {
+                  setError(null);
+                  triage.mutate();
+                }}
+                className="btn-primary"
+              >
+                {triage.isPending ? 'Starting…' : 'Start work'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isStaff && t.status !== 'awaiting_triage' && (
+          <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-5">
+            <span className="section-title mr-2">Assignee</span>
+            <select
+              className="field-select-sm"
+              value={t.assignee_id ?? ''}
+              onChange={(e) => reassign.mutate(e.target.value)}
+              disabled={reassign.isPending}
+            >
+              <option value="">Unassigned</option>
+              {(assigneesQ.data ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name || p.email || p.id} ({p.role})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {availableStatuses.length > 0 && (
           <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-5">
