@@ -207,6 +207,10 @@ function renderTemplate(opts: {
       View ticket →
     </a>
 
+    <p style="margin:16px 0 0;color:#9ca3af;font-size:12px">
+      Replies to this email are not monitored. Click <strong>View ticket</strong> above to respond on AcademyDesk.
+    </p>
+
     <p style="margin:24px 0 0;color:#9ca3af;font-size:11px;border-top:1px solid #e5e7eb;padding-top:16px">
       AcademyDesk · Warwick Academy helpdesk
     </p>
@@ -221,6 +225,8 @@ function renderTemplate(opts: {
     `${DEPT_LABEL[opts.ticket.department] ?? opts.ticket.department} · Priority ${PRIORITY_LABEL[opts.ticket.priority] ?? opts.ticket.priority} · Status ${STATUS_LABEL[opts.ticket.status] ?? opts.ticket.status}`,
     opts.bodyBlock ? `\n${opts.bodyBlock}\n` : '',
     `View: ${link}`,
+    '',
+    'Replies to this email are not monitored. Open the link above to respond on AcademyDesk.',
   ].join('\n');
 
   return { html, text };
