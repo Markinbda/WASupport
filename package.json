@@ -18,7 +18,9 @@
   },
   "dependencies": {
     "@netlify/functions": "^2.8.1",
-    "@supabase/supabase-js": "^2.45.4"
+    "@supabase/supabase-js": "^2.45.4",
+    "@types/ws": "^8.18.1",
+    "ws": "^8.20.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",

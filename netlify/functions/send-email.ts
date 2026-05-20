@@ -20,6 +20,7 @@
  */
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 
 type SupabaseWebhookPayload = {
   type: 'INSERT' | 'UPDATE' | 'DELETE';
@@ -245,6 +246,7 @@ export const handler: Handler = async (event) => {
 
   const supabase = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
     auth: { persistSession: false },
+    realtime: { transport: WebSocket as unknown as typeof globalThis.WebSocket },
   });
   const appUrl = process.env.APP_URL ?? 'http://localhost:8888';
 
