@@ -20,9 +20,11 @@
     "@netlify/functions": "^2.8.1",
     "@supabase/supabase-js": "^2.45.4",
     "@types/ws": "^8.18.1",
+    "busboy": "^1.6.0",
     "ws": "^8.20.1"
   },
   "devDependencies": {
+    "@types/busboy": "^1.5.4",
     "@types/node": "^20.14.10",
     "csv-parse": "^6.2.1",
     "dotenv": "^17.4.2",
