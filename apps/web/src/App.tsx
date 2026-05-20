@@ -11,6 +11,9 @@ import AdminUsers from './pages/AdminUsers';
 import AdminCategories from './pages/AdminCategories';
 import AdminLocations from './pages/AdminLocations';
 import AdminNotifications from './pages/AdminNotifications';
+import KbList from './pages/KbList';
+import KbArticleView from './pages/KbArticleView';
+import KbEdit from './pages/KbEdit';
 
 export default function App() {
   return (
@@ -26,6 +29,10 @@ export default function App() {
           <Route path="/admin/categories" element={<AdminCategories />} />
           <Route path="/admin/locations" element={<AdminLocations />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
+          <Route path="/kb" element={<KbList />} />
+          <Route path="/kb/new" element={<KbEdit />} />
+          <Route path="/kb/:slug" element={<KbArticleView />} />
+          <Route path="/kb/:slug/edit" element={<KbEdit />} />
           <Route path="/status" element={<StatusPage />} />
         </Route>
       </Route>

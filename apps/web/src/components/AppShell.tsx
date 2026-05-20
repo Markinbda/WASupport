@@ -36,6 +36,9 @@ export default function AppShell() {
             <NavLink to="/" end className={linkClass}>
               My tickets
             </NavLink>
+            <NavLink to="/kb" className={linkClass}>
+              Knowledge base
+            </NavLink>
             {isStaff && (
               <NavLink to="/queue" className={linkClass}>
                 Queue

@@ -120,3 +120,21 @@ export const PRIORITY_BADGE: Record<TicketPriority, string> = {
   critical: 'badge-critical',
   urgent: 'badge-urgent',
 };
+
+export type KbStatus = 'draft' | 'published';
+
+export interface KbArticle {
+  id: string;
+  slug: string;
+  title: string;
+  body_md: string;
+  summary: string | null;
+  department: Department | null;
+  tags: string[];
+  status: KbStatus;
+  author_id: string | null;
+  view_count: number;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+}

@@ -175,4 +175,57 @@
   .empty-state {
     @apply rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 p-12 text-center text-sm text-slate-500;
   }
+
+  /* ---------- KB markdown prose ---------- */
+  .kb-prose {
+    @apply text-slate-800 leading-relaxed;
+  }
+  .kb-prose h1 {
+    @apply mt-8 mb-3 text-2xl font-bold text-slate-900;
+  }
+  .kb-prose h2 {
+    @apply mt-8 mb-3 text-xl font-bold text-slate-900;
+  }
+  .kb-prose h3 {
+    @apply mt-6 mb-2 text-lg font-semibold text-slate-900;
+  }
+  .kb-prose p {
+    @apply my-3;
+  }
+  .kb-prose ul {
+    @apply my-3 list-disc pl-6;
+  }
+  .kb-prose ol {
+    @apply my-3 list-decimal pl-6;
+  }
+  .kb-prose li {
+    @apply my-1;
+  }
+  .kb-prose a {
+    @apply text-sky-700 underline hover:text-sky-900;
+  }
+  .kb-prose code {
+    @apply rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.9em] text-slate-800;
+  }
+  .kb-prose pre {
+    @apply my-4 overflow-x-auto rounded-lg bg-slate-900 p-4 text-sm text-slate-100;
+  }
+  .kb-prose pre code {
+    @apply bg-transparent p-0 text-slate-100;
+  }
+  .kb-prose blockquote {
+    @apply my-4 border-l-4 border-slate-300 pl-4 italic text-slate-600;
+  }
+  .kb-prose table {
+    @apply my-4 w-full border-collapse text-sm;
+  }
+  .kb-prose th, .kb-prose td {
+    @apply border border-slate-200 px-3 py-2 text-left;
+  }
+  .kb-prose th {
+    @apply bg-slate-50 font-semibold;
+  }
+  .kb-prose hr {
+    @apply my-6 border-slate-200;
+  }
 }
