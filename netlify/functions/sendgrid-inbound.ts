@@ -11,6 +11,10 @@
  *   SUPABASE_SERVICE_ROLE_KEY
  *   INBOUND_ALLOWED_DOMAINS         (optional) comma-separated allowlist; empty = accept any
  *   INBOUND_DEFAULT_DEPARTMENT      (optional) IT|FAC|HS — default when To-address has no hint
+ *   INBOUND_ALLOW_NEW_TICKETS       (optional) "true" to allow brand-new tickets from email.
+ *                                   Default false: only replies to existing tickets are accepted
+ *                                   (subject must contain [IT-####] / [FAC-####] / [HS-####]).
+ *                                   Users are otherwise expected to log in to create tickets.
  *
  * Routing:
  *   - To: it@/tech@/helpdesk@/support@   → IT
@@ -351,11 +355,27 @@ export const handler: Handler = async (event) => {
       };
     }
     console.warn(
-      `[sendgrid-inbound] subject mentioned unknown ref ${refInSubject}; creating new ticket`,
+      `[sendgrid-inbound] subject mentioned unknown ref ${refInSubject}; treating as new-ticket request`,
     );
   }
 
-  // New-ticket path
+  // New-ticket path — gated. Default policy: users must log in to file
+  // tickets. Email is only used for replies on existing tickets.
+  const allowNew = (process.env.INBOUND_ALLOW_NEW_TICKETS ?? '').toLowerCase() === 'true';
+  if (!allowNew) {
+    console.log(
+      `[sendgrid-inbound] new-ticket creation disabled; dropping email from ${senderEmail} subject="${subject}"`,
+    );
+    return {
+      statusCode: 202,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        accepted: false,
+        reason: 'new tickets via email are disabled; please log in to submit a ticket',
+      }),
+    };
+  }
+
   const ticket = await createTicket({
     department,
     subject,
