@@ -19,8 +19,42 @@
  *   STAFF_NOTIFY_HS               comma-separated emails for new H&S tickets
  */
 import type { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
-import WebSocket from 'ws';
+
+// ---------------------------------------------------------------------
+// Tiny PostgREST helper — avoids @supabase/supabase-js (and its WebSocket
+// dependency) entirely. The service role key bypasses RLS.
+// ---------------------------------------------------------------------
+function pgrest(): { url: string; key: string } {
+  return { url: env('SUPABASE_URL').replace(/\/$/, '') + '/rest/v1', key: env('SUPABASE_SERVICE_ROLE_KEY') };
+}
+async function restSelect<T = unknown>(
+  table: string,
+  query: string,
+): Promise<T[]> {
+  const { url, key } = pgrest();
+  const res = await fetch(`${url}/${table}?${query}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  });
+  if (!res.ok) throw new Error(`PostgREST ${table} ${res.status}: ${await res.text()}`);
+  return (await res.json()) as T[];
+}
+async function restInsert(table: string, row: Record<string, unknown>): Promise<void> {
+  const { url, key } = pgrest();
+  const res = await fetch(`${url}/${table}`, {
+    method: 'POST',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'content-type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) {
+    // Swallow log-write failures — never block the webhook on telemetry.
+    console.error(`[send-email] insert into ${table} failed:`, res.status, await res.text());
+  }
+}
 
 type SupabaseWebhookPayload = {
   type: 'INSERT' | 'UPDATE' | 'DELETE';
@@ -193,32 +227,26 @@ function renderTemplate(opts: {
 }
 
 async function resolveEmail(
-  supabase: ReturnType<typeof createClient>,
   userId: string | null,
   fallback?: string | null,
 ): Promise<string | null> {
   if (fallback) return fallback;
   if (!userId) return null;
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('email')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error || !data) return null;
-  return (data as { email: string }).email ?? null;
+  const rows = await restSelect<{ email: string }>(
+    'profiles',
+    `select=email&id=eq.${encodeURIComponent(userId)}&limit=1`,
+  );
+  return rows[0]?.email ?? null;
 }
 
-async function logNotification(
-  supabase: ReturnType<typeof createClient>,
-  row: {
-    ticket_id: string;
-    event: string;
-    recipients: string[];
-    status: 'sent' | 'skipped' | 'error';
-    error?: string;
-  },
-) {
-  await supabase.from('notifications_log').insert({
+async function logNotification(row: {
+  ticket_id: string;
+  event: string;
+  recipients: string[];
+  status: 'sent' | 'skipped' | 'error';
+  error?: string;
+}): Promise<void> {
+  await restInsert('notifications_log', {
     ticket_id: row.ticket_id,
     event: row.event,
     recipients: row.recipients,
@@ -244,10 +272,6 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: 'Invalid JSON' };
   }
 
-  const supabase = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
-    auth: { persistSession: false },
-    realtime: { transport: WebSocket as unknown as typeof globalThis.WebSocket },
-  });
   const appUrl = process.env.APP_URL ?? 'http://localhost:8888';
 
   try {
@@ -255,11 +279,11 @@ export const handler: Handler = async (event) => {
     if (payload.table === 'tickets' && payload.type === 'INSERT') {
       const t = payload.record as unknown as Ticket;
       const recipients = new Set<string>(deptStaffEmails(t.department));
-      const submitterEmail = await resolveEmail(supabase, t.submitter_id, t.legacy_submitter_email);
+      const submitterEmail = await resolveEmail(t.submitter_id, t.legacy_submitter_email);
       if (submitterEmail) recipients.add(submitterEmail);
 
       if (recipients.size === 0) {
-        await logNotification(supabase, {
+        await logNotification({
           ticket_id: t.id,
           event: 'ticket.created',
           recipients: [],
@@ -281,7 +305,7 @@ export const handler: Handler = async (event) => {
         subject: `[${t.ref}] ${t.subject}`,
         ...tpl,
       });
-      await logNotification(supabase, {
+      await logNotification({
         ticket_id: t.id,
         event: 'ticket.created',
         recipients: [...recipients],
@@ -298,9 +322,9 @@ export const handler: Handler = async (event) => {
         return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: 'no status change' }) };
       }
 
-      const submitterEmail = await resolveEmail(supabase, t.submitter_id, t.legacy_submitter_email);
+      const submitterEmail = await resolveEmail(t.submitter_id, t.legacy_submitter_email);
       if (!submitterEmail) {
-        await logNotification(supabase, {
+        await logNotification({
           ticket_id: t.id,
           event: 'ticket.status_changed',
           recipients: [],
@@ -321,7 +345,7 @@ export const handler: Handler = async (event) => {
         subject: `[${t.ref}] Status: ${STATUS_LABEL[t.status] ?? t.status}`,
         ...tpl,
       });
-      await logNotification(supabase, {
+      await logNotification({
         ticket_id: t.id,
         event: 'ticket.status_changed',
         recipients: [submitterEmail],
@@ -337,17 +361,14 @@ export const handler: Handler = async (event) => {
         return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: 'internal note' }) };
       }
 
-      const { data: ticketData, error: ticketErr } = await supabase
-        .from('tickets')
-        .select(
-          'id, ref, subject, description, department, priority, status, submitter_id, legacy_submitter_email, legacy_submitter_name',
-        )
-        .eq('id', m.ticket_id)
-        .single();
-      if (ticketErr || !ticketData) {
+      const ticketRows = await restSelect<Ticket>(
+        'tickets',
+        `select=id,ref,subject,description,department,priority,status,submitter_id,legacy_submitter_email,legacy_submitter_name&id=eq.${encodeURIComponent(m.ticket_id)}&limit=1`,
+      );
+      if (!ticketRows[0]) {
         return { statusCode: 200, body: JSON.stringify({ ok: false, error: 'ticket not found' }) };
       }
-      const t = ticketData as unknown as Ticket;
+      const t = ticketRows[0];
 
       const authorIsSubmitter = m.author_id && m.author_id === t.submitter_id;
       const recipients = new Set<string>();
@@ -356,16 +377,12 @@ export const handler: Handler = async (event) => {
         deptStaffEmails(t.department).forEach((e) => recipients.add(e));
       } else {
         // Notify submitter
-        const submitterEmail = await resolveEmail(
-          supabase,
-          t.submitter_id,
-          t.legacy_submitter_email,
-        );
+        const submitterEmail = await resolveEmail(t.submitter_id, t.legacy_submitter_email);
         if (submitterEmail) recipients.add(submitterEmail);
       }
 
       if (recipients.size === 0) {
-        await logNotification(supabase, {
+        await logNotification({
           ticket_id: t.id,
           event: 'ticket.reply',
           recipients: [],
@@ -389,7 +406,7 @@ export const handler: Handler = async (event) => {
         subject: `[${t.ref}] New reply`,
         ...tpl,
       });
-      await logNotification(supabase, {
+      await logNotification({
         ticket_id: t.id,
         event: 'ticket.reply',
         recipients: [...recipients],
