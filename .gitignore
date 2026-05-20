@@ -39,3 +39,7 @@ coverage/
 apps/web/src/**/*.js
 apps/web/src/**/*.js.map
 apps/web/vite.config.js
+
+# local scratch / sensitive exports
+.local/
+

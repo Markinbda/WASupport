@@ -1,0 +1,122 @@
+/** Database row types — replace with `supabase gen types` output in Phase 2. */
+
+export type Department = 'IT' | 'FAC' | 'HS';
+export type TicketStatus = 'open' | 'in_progress' | 'on_hold' | 'resolved' | 'closed';
+export type TicketPriority = 'low' | 'normal' | 'high' | 'critical' | 'urgent';
+export type UserRole =
+  | 'submitter'
+  | 'it_tech'
+  | 'fac_tech'
+  | 'hs_officer'
+  | 'support'
+  | 'manager'
+  | 'admin'
+  | 'leadership';
+
+export interface Profile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: UserRole;
+  department: Department | null;
+  created_at: string;
+}
+
+export interface Ticket {
+  id: string;
+  ref: string;
+  department: Department;
+  category_id: string | null;
+  subject: string;
+  description: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  submitter_id: string | null;
+  assignee_id: string | null;
+  location_id: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  closed_at: string | null;
+  legacy_ref: string | null;
+  legacy_submitter_name: string | null;
+  legacy_assignee_name: string | null;
+  legacy_subcategory: string | null;
+  legacy_location: string | null;
+  imported_from: string | null;
+}
+
+export interface TicketMessage {
+  id: string;
+  ticket_id: string;
+  author_id: string;
+  body: string;
+  is_internal: boolean;
+  created_at: string;
+}
+
+export interface Category {
+  id: string;
+  department: Department;
+  name: string;
+  parent_id: string | null;
+  is_active: boolean;
+}
+
+export interface Location {
+  id: string;
+  building: string;
+  floor: string | null;
+  room: string | null;
+  label: string;
+  is_active: boolean;
+}
+
+export const DEPARTMENT_LABEL: Record<Department, string> = {
+  IT: 'IT Support',
+  FAC: 'Facilities',
+  HS: 'Health & Safety',
+};
+
+export const PRIORITY_LABEL: Record<TicketPriority, string> = {
+  low: 'Low',
+  normal: 'Normal',
+  high: 'High',
+  critical: 'Critical',
+  urgent: 'Urgent',
+};
+
+export const STATUS_LABEL: Record<TicketStatus, string> = {
+  open: 'Open',
+  in_progress: 'In progress',
+  on_hold: 'On hold',
+  resolved: 'Resolved',
+  closed: 'Closed',
+};
+
+export const ROLE_LABEL: Record<UserRole, string> = {
+  submitter: 'Submitter',
+  it_tech: 'IT Technician',
+  fac_tech: 'Facilities Technician',
+  hs_officer: 'H&S Officer',
+  support: 'Support (close only)',
+  manager: 'Manager',
+  admin: 'Administrator',
+  leadership: 'Leadership (read only)',
+};
+
+export const STATUS_BADGE: Record<TicketStatus, string> = {
+  open: 'badge-open',
+  in_progress: 'badge-progress',
+  on_hold: 'badge-hold',
+  resolved: 'badge-resolved',
+  closed: 'badge-closed',
+};
+
+export const PRIORITY_BADGE: Record<TicketPriority, string> = {
+  low: 'badge-low',
+  normal: 'badge-normal',
+  high: 'badge-high',
+  critical: 'badge-critical',
+  urgent: 'badge-urgent',
+};

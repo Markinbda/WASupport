@@ -13,16 +13,16 @@
   node_bundler = "esbuild"
   directory = "netlify/functions"
 
+# Friendly URLs for functions (must come BEFORE the SPA fallback)
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
 # SPA fallback so React Router works
 [[redirects]]
   from = "/*"
   to = "/index.html"
-  status = 200
-
-# Friendly URLs for functions
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
   status = 200
 
 [dev]

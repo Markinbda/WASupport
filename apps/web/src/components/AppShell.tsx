@@ -1,0 +1,89 @@
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
+import { ROLE_LABEL } from '../lib/types';
+
+export default function AppShell() {
+  const { user, role, isStaff, isAdmin, isManager, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  async function handleSignOut() {
+    await signOut();
+    navigate('/signin');
+  }
+
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    [
+      'text-sm transition-colors duration-200',
+      isActive ? 'text-white font-medium' : 'text-slate-300 hover:text-white',
+    ].join(' ');
+
+  return (
+    <div className="min-h-screen">
+      <header
+        className="bg-[#1a2744] text-white"
+        style={{ borderBottom: '1px solid #2a3a5c' }}
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
+          <Link
+            to="/"
+            className="text-lg font-semibold text-white"
+            style={{ letterSpacing: '0.5px' }}
+          >
+            AcademyDesk
+          </Link>
+
+          <nav className="flex flex-wrap items-center gap-6">
+            <NavLink to="/" end className={linkClass}>
+              My tickets
+            </NavLink>
+            {isStaff && (
+              <NavLink to="/queue" className={linkClass}>
+                Queue
+              </NavLink>
+            )}
+            {isAdmin && (
+              <NavLink to="/admin/users" className={linkClass}>
+                Users
+              </NavLink>
+            )}
+            {isManager && (
+              <NavLink to="/admin/categories" className={linkClass}>
+                Categories
+              </NavLink>
+            )}
+            {isManager && (
+              <NavLink to="/admin/locations" className={linkClass}>
+                Locations
+              </NavLink>
+            )}
+            <NavLink to="/status" className={linkClass}>
+              Status
+            </NavLink>
+
+            <NavLink to="/new" className="btn-pill">
+              + New ticket
+            </NavLink>
+
+            <div className="ml-2 hidden flex-col items-end leading-tight md:flex">
+              <span className="text-xs text-slate-300">{user?.email}</span>
+              {role && (
+                <span className="text-[11px] text-slate-400">{ROLE_LABEL[role]}</span>
+              )}
+            </div>
+
+            <button
+              onClick={handleSignOut}
+              className="rounded-md border border-white/20 px-3 py-1.5 text-xs text-slate-200 transition-colors duration-200 hover:bg-white/10 hover:text-white"
+            >
+              Sign out
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-6 py-10">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
