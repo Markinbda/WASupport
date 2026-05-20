@@ -56,6 +56,11 @@ export default function AppShell() {
                 Locations
               </NavLink>
             )}
+            {isManager && (
+              <NavLink to="/admin/notifications" className={linkClass}>
+                Notifications
+              </NavLink>
+            )}
             <NavLink to="/status" className={linkClass}>
               Status
             </NavLink>

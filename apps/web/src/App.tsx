@@ -10,6 +10,7 @@ import Queue from './pages/Queue';
 import AdminUsers from './pages/AdminUsers';
 import AdminCategories from './pages/AdminCategories';
 import AdminLocations from './pages/AdminLocations';
+import AdminNotifications from './pages/AdminNotifications';
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/categories" element={<AdminCategories />} />
           <Route path="/admin/locations" element={<AdminLocations />} />
+          <Route path="/admin/notifications" element={<AdminNotifications />} />
           <Route path="/status" element={<StatusPage />} />
         </Route>
       </Route>
