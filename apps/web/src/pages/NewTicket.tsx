@@ -18,6 +18,7 @@ export default function NewTicket() {
 
   const [department, setDepartment] = useState<Department>('IT');
   const [categoryId, setCategoryId] = useState<string>('');
+  const [subcategoryId, setSubcategoryId] = useState<string>('');
   const [locationId, setLocationId] = useState<string>('');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
@@ -59,6 +60,7 @@ export default function NewTicket() {
         .insert({
           department,
           category_id: categoryId || null,
+          subcategory_id: subcategoryId || null,
           location_id: locationId || null,
           subject,
           description,
@@ -77,7 +79,9 @@ export default function NewTicket() {
   });
 
   const filteredCategories =
-    categoriesQ.data?.filter((c) => c.department === department) ?? [];
+    categoriesQ.data?.filter((c) => c.department === department && c.parent_id === null) ?? [];
+  const filteredSubcategories =
+    categoriesQ.data?.filter((c) => c.parent_id === categoryId) ?? [];
 
   return (
     <section className="mx-auto max-w-2xl">
@@ -105,6 +109,7 @@ export default function NewTicket() {
               onChange={(e) => {
                 setDepartment(e.target.value as Department);
                 setCategoryId('');
+                setSubcategoryId('');
               }}
               className="field-select"
             >
@@ -124,8 +129,30 @@ export default function NewTicket() {
               id="category"
               options={filteredCategories.map((c) => ({ value: c.id, label: c.name }))}
               value={categoryId}
-              onChange={setCategoryId}
+              onChange={(v) => {
+                setCategoryId(v);
+                setSubcategoryId('');
+              }}
               placeholder="Type to search categories…"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="subcategory" className="field-label">
+              Subcategory
+            </label>
+            <Combobox
+              id="subcategory"
+              options={filteredSubcategories.map((c) => ({ value: c.id, label: c.name }))}
+              value={subcategoryId}
+              onChange={setSubcategoryId}
+              placeholder={
+                categoryId
+                  ? filteredSubcategories.length
+                    ? 'Type to search subcategories…'
+                    : 'No subcategories — leave blank'
+                  : 'Select a category first'
+              }
             />
           </div>
 

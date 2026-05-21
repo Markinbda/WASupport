@@ -33,6 +33,7 @@ export interface Ticket {
   ref: string;
   department: Department;
   category_id: string | null;
+  subcategory_id: string | null;
   subject: string;
   description: string;
   status: TicketStatus;

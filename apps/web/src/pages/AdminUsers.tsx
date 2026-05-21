@@ -20,6 +20,11 @@ export default function AdminUsers() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newRole, setNewRole] = useState<UserRole>('submitter');
+  const [createMsg, setCreateMsg] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-users', search],
@@ -51,6 +56,38 @@ export default function AdminUsers() {
     onError: (e: Error) => setError(e.message),
   });
 
+  const createUser = useMutation({
+    mutationFn: async () => {
+      if (!supabase) throw new Error('Supabase not configured');
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) throw new Error('No active session');
+      const res = await fetch('/api/admin-create-user', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: newEmail.trim(),
+          full_name: newName.trim() || undefined,
+          role: newRole,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+    },
+    onSuccess: () => {
+      setCreateMsg(`Invitation sent to ${newEmail.trim()}.`);
+      setNewEmail('');
+      setNewName('');
+      setNewRole('submitter');
+      setShowAdd(false);
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
   if (!isAdmin) {
     return <p className="alert-warn">Admins only. Your role: {role ?? 'unknown'}.</p>;
   }
@@ -72,6 +109,83 @@ export default function AdminUsers() {
           className="field-sm w-72"
         />
       </div>
+
+      <div className="mb-4 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => {
+            setShowAdd((s) => !s);
+            setError(null);
+            setCreateMsg(null);
+          }}
+          className="btn-primary"
+        >
+          {showAdd ? 'Cancel' : '+ Add user'}
+        </button>
+        {createMsg && <p className="text-sm text-emerald-700">{createMsg}</p>}
+      </div>
+
+      {showAdd && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setError(null);
+            setCreateMsg(null);
+            createUser.mutate();
+          }}
+          className="card-pad mb-6 grid gap-3 md:grid-cols-4"
+        >
+          <div>
+            <label htmlFor="nu-email" className="field-label">Email</label>
+            <input
+              id="nu-email"
+              type="email"
+              required
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              className="field"
+              placeholder="person@warwick.bm"
+            />
+          </div>
+          <div>
+            <label htmlFor="nu-name" className="field-label">Full name</label>
+            <input
+              id="nu-name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="field"
+              placeholder="Jane Doe"
+            />
+          </div>
+          <div>
+            <label htmlFor="nu-role" className="field-label">Role</label>
+            <select
+              id="nu-role"
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value as UserRole)}
+              className="field-select"
+            >
+              {ASSIGNABLE_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_LABEL[r]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              type="submit"
+              disabled={createUser.isPending || !newEmail.trim()}
+              className="btn-primary w-full"
+            >
+              {createUser.isPending ? 'Sending invite…' : 'Send invite'}
+            </button>
+          </div>
+          <p className="md:col-span-4 text-xs text-slate-500">
+            An invitation email is sent via Supabase. The user sets their own password on first sign-in.
+          </p>
+        </form>
+      )}
 
       {error && <p className="mb-4 alert-error">{error}</p>}
       {isLoading && <p className="text-sm text-slate-500">Loading users…</p>}
