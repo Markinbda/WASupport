@@ -62,18 +62,28 @@ export default function AdminUsers() {
       const { data: sess } = await supabase.auth.getSession();
       const token = sess.session?.access_token;
       if (!token) throw new Error('No active session');
-      const res = await fetch('/api/admin-create-user', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          email: newEmail.trim(),
-          full_name: newName.trim() || undefined,
-          role: newRole,
-        }),
-      });
+      let res: Response;
+      try {
+        res = await fetch('/api/admin-create-user', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            email: newEmail.trim(),
+            full_name: newName.trim() || undefined,
+            role: newRole,
+          }),
+        });
+      } catch (e) {
+        // TypeError: failed to fetch — the API endpoint is unreachable.
+        // In local dev this means `netlify dev` isn't running alongside Vite
+        // (Vite proxies /api/* to http://localhost:8888).
+        throw new Error(
+          `Could not reach /api/admin-create-user. In local dev, run \`pnpm netlify:dev\` instead of \`pnpm dev\`, or start \`netlify dev\` in a second terminal. (${(e as Error).message})`,
+        );
+      }
       const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
     },

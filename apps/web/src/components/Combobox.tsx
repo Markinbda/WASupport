@@ -51,11 +51,15 @@ export function Combobox({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return options.slice(0, maxResults);
+    // When the input still shows the currently-selected label verbatim,
+    // treat it like an empty query so the user can see every option and
+    // pick a different one without manually clearing the field first.
+    const currentLabel = value ? byValue.get(value)?.toLowerCase() : undefined;
+    if (!q || q === currentLabel) return options.slice(0, maxResults);
     return options
       .filter((o) => o.label.toLowerCase().includes(q))
       .slice(0, maxResults);
-  }, [options, query, maxResults]);
+  }, [options, query, maxResults, value, byValue]);
 
   // Close on outside click.
   useEffect(() => {
@@ -103,7 +107,13 @@ export function Combobox({
         disabled={disabled}
         value={query}
         placeholder={placeholder}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          setOpen(true);
+          // Select all so the user can immediately retype to replace the
+          // current selection, instead of the existing label acting as a
+          // filter that narrows the dropdown to a single match.
+          inputRef.current?.select();
+        }}
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);
@@ -124,6 +134,7 @@ export function Combobox({
         onClick={() => {
           setOpen((o) => !o);
           inputRef.current?.focus();
+          inputRef.current?.select();
         }}
         className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600"
         aria-label="Toggle options"

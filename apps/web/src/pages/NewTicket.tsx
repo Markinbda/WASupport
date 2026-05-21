@@ -143,6 +143,7 @@ export default function NewTicket() {
             </label>
             <Combobox
               id="subcategory"
+              key={categoryId || 'none'}
               options={filteredSubcategories.map((c) => ({ value: c.id, label: c.name }))}
               value={subcategoryId}
               onChange={setSubcategoryId}
