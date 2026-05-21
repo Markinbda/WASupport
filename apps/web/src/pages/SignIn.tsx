@@ -48,7 +48,7 @@ export default function SignIn() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center p-6">
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold text-brand-navy" style={{ letterSpacing: '0.5px' }}>
-          AcademyDesk
+          WA Support Center
         </h1>
         <p className="mt-1 text-sm italic text-slate-500">
           Warwick Academy helpdesk &amp; AI assistant

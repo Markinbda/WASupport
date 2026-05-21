@@ -152,7 +152,7 @@ async function sendgridSend(opts: {
     },
     body: JSON.stringify({
       personalizations: [{ to: opts.to.map((email) => ({ email })) }],
-      from: { email: from, name: 'AcademyDesk' },
+      from: { email: from, name: 'WA Support Center' },
       subject: opts.subject,
       content: [
         { type: 'text/plain', value: opts.text },
@@ -194,7 +194,7 @@ function renderEmail(opts: {
       Open ticket →
     </a>
     <p style="margin:24px 0 0;color:#9ca3af;font-size:11px;border-top:1px solid #e5e7eb;padding-top:16px">
-      AcademyDesk · Warwick Academy helpdesk
+      WA Support Center · Warwick Academy helpdesk
     </p>
   </div>
 </body></html>`.trim();

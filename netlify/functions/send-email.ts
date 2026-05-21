@@ -142,7 +142,7 @@ async function sendgridSend(opts: {
 
   const body = {
     personalizations: [{ to: opts.to.map((email) => ({ email })) }],
-    from: { email: from, name: 'AcademyDesk' },
+    from: { email: from, name: 'WA Support Center' },
     reply_to: opts.replyTo ? { email: opts.replyTo } : undefined,
     subject: opts.subject,
     content: [
@@ -211,11 +211,11 @@ function renderTemplate(opts: {
     </a>
 
     <p style="margin:16px 0 0;color:#9ca3af;font-size:12px">
-      Replies to this email are not monitored. Click <strong>View ticket</strong> above to respond on AcademyDesk.
+      Replies to this email are not monitored. Click <strong>View ticket</strong> above to respond on the WA Support Center.
     </p>
 
     <p style="margin:24px 0 0;color:#9ca3af;font-size:11px;border-top:1px solid #e5e7eb;padding-top:16px">
-      AcademyDesk · Warwick Academy helpdesk
+      WA Support Center · Warwick Academy helpdesk
     </p>
   </div>
 </body></html>`.trim();
@@ -229,7 +229,7 @@ function renderTemplate(opts: {
     opts.bodyBlock ? `\n${opts.bodyBlock}\n` : '',
     `View: ${link}`,
     '',
-    'Replies to this email are not monitored. Open the link above to respond on AcademyDesk.',
+    'Replies to this email are not monitored. Open the link above to respond on the WA Support Center.',
   ].join('\n');
 
   return { html, text };

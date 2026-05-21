@@ -29,7 +29,7 @@ export default function AppShell() {
             className="text-lg font-semibold text-white"
             style={{ letterSpacing: '0.5px' }}
           >
-            AcademyDesk
+            WA Support Center
           </Link>
 
           <nav className="flex flex-wrap items-center gap-6">
