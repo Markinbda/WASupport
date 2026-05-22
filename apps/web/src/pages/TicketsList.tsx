@@ -35,9 +35,11 @@ function formatDuration(fromIso: string, toIso: string | null): string {
   const hours = Math.floor(ms / hr);
   ms -= hours * hr;
   const mins = Math.floor(ms / min);
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${mins}m`;
-  return `${mins}m`;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  parts.push(`${mins}m`);
+  return parts.join(' ');
 }
 
 export default function TicketsList() {
