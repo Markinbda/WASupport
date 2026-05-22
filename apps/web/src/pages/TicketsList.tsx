@@ -23,6 +23,23 @@ const FILTER_DESCRIPTIONS: Record<Filter, string> = {
   closed_dept: 'Resolved and closed tickets in your department.',
 };
 
+function formatDuration(fromIso: string, toIso: string | null): string {
+  const from = new Date(fromIso).getTime();
+  const to = toIso ? new Date(toIso).getTime() : Date.now();
+  let ms = Math.max(0, to - from);
+  const day = 24 * 60 * 60 * 1000;
+  const hr = 60 * 60 * 1000;
+  const min = 60 * 1000;
+  const days = Math.floor(ms / day);
+  ms -= days * day;
+  const hours = Math.floor(ms / hr);
+  ms -= hours * hr;
+  const mins = Math.floor(ms / min);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
 export default function TicketsList() {
   const { user, profile, isStaff } = useAuth();
   const [filter, setFilter] = useState<Filter>('mine');
@@ -69,6 +86,37 @@ export default function TicketsList() {
       return data as Ticket[];
     },
   });
+
+  const userIds = Array.from(
+    new Set(
+      (data ?? [])
+        .flatMap((t) => [t.submitter_id, t.assignee_id])
+        .filter((x): x is string => !!x),
+    ),
+  );
+
+  const { data: people } = useQuery({
+    queryKey: ['ticket-list-profiles', userIds.sort().join(',')],
+    enabled: userIds.length > 0 && !!supabase,
+    queryFn: async (): Promise<Record<string, string>> => {
+      if (!supabase) return {};
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', userIds);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const p of (data ?? []) as Array<{ id: string; full_name: string | null; email: string }>) {
+        map[p.id] = p.full_name ?? p.email;
+      }
+      return map;
+    },
+  });
+
+  const nameFor = (id: string | null, fallback: string | null): string => {
+    if (id && people && people[id]) return people[id];
+    return fallback ?? '—';
+  };
 
   const pillBase =
     'rounded-full border px-3 py-1 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-1';
@@ -162,34 +210,51 @@ export default function TicketsList() {
                 <th>Ref</th>
                 <th>Subject</th>
                 <th>Department</th>
+                <th>Submitted by</th>
+                <th>Assigned to</th>
                 <th>Priority</th>
                 <th>Status</th>
-                <th>Updated</th>
+                <th>Opened</th>
+                <th>Duration</th>
               </tr>
             </thead>
             <tbody>
-              {data.map((t) => (
-                <tr key={t.id}>
-                  <td>
-                    <Link to={`/tickets/${t.id}`} className="ref-link">
-                      {t.ref}
-                    </Link>
-                  </td>
-                  <td className="text-slate-700">{t.subject}</td>
-                  <td className="text-slate-600">{DEPARTMENT_LABEL[t.department]}</td>
-                  <td>
-                    <span className={PRIORITY_BADGE[t.priority]}>
-                      {PRIORITY_LABEL[t.priority]}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={STATUS_BADGE[t.status]}>{STATUS_LABEL[t.status]}</span>
-                  </td>
-                  <td className="text-xs text-slate-500">
-                    {new Date(t.updated_at).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
+              {data.map((t) => {
+                const isClosed = (CLOSED_STATUSES as readonly string[]).includes(t.status);
+                const endIso = isClosed ? t.closed_at ?? t.resolved_at : null;
+                return (
+                  <tr key={t.id}>
+                    <td>
+                      <Link to={`/tickets/${t.id}`} className="ref-link">
+                        {t.ref}
+                      </Link>
+                    </td>
+                    <td className="text-slate-700">{t.subject}</td>
+                    <td className="text-slate-600">{DEPARTMENT_LABEL[t.department]}</td>
+                    <td className="text-slate-700">
+                      {nameFor(t.submitter_id, t.legacy_submitter_name)}
+                    </td>
+                    <td className="text-slate-700">
+                      {nameFor(t.assignee_id, t.legacy_assignee_name)}
+                    </td>
+                    <td>
+                      <span className={PRIORITY_BADGE[t.priority]}>
+                        {PRIORITY_LABEL[t.priority]}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={STATUS_BADGE[t.status]}>{STATUS_LABEL[t.status]}</span>
+                    </td>
+                    <td className="text-xs text-slate-500">
+                      {new Date(t.created_at).toLocaleString()}
+                    </td>
+                    <td className="text-xs text-slate-500">
+                      {formatDuration(t.created_at, endIso)}
+                      {!isClosed && <span className="ml-1 text-slate-400">(open)</span>}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
