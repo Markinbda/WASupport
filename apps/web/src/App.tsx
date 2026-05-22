@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import AppShell from './components/AppShell';
 import RequireAuth from './components/RequireAuth';
 import SignIn from './pages/SignIn';
+import AuthCallback from './pages/AuthCallback';
 import TicketsList from './pages/TicketsList';
 import NewTicket from './pages/NewTicket';
 import TicketDetail from './pages/TicketDetail';
@@ -20,6 +21,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/signin" element={<SignIn />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route path="/" element={<TicketsList />} />

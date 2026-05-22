@@ -91,6 +91,10 @@ export const handler: Handler = async (event) => {
   if (prof[0]?.role !== 'admin') return json(403, { error: 'Admin only' });
 
   // 3. Invite the new user (sends email via Supabase's configured provider).
+  //    Netlify auto-sets `URL` to the site's primary URL; fall back to the live site.
+  const siteUrl = (process.env.PUBLIC_SITE_URL || process.env.URL || 'https://warwickacademy.netlify.app').replace(/\/$/, '');
+  const redirectTo = `${siteUrl}/auth/callback`;
+
   const inviteRes = await fetch(`${supabaseUrl}/auth/v1/invite`, {
     method: 'POST',
     headers: {
@@ -98,7 +102,11 @@ export const handler: Handler = async (event) => {
       Authorization: `Bearer ${serviceKey}`,
       'content-type': 'application/json',
     },
-    body: JSON.stringify({ email, data: full_name ? { full_name } : undefined }),
+    body: JSON.stringify({
+      email,
+      data: full_name ? { full_name } : undefined,
+      redirect_to: redirectTo,
+    }),
   });
   const inviteBody = await inviteRes.text();
   if (!inviteRes.ok) {
