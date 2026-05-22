@@ -30,10 +30,15 @@ const ASSIGNABLE_ROLES: UserRole[] = [
 const DEPARTMENTS: Department[] = ['IT', 'FAC', 'HS'];
 
 export default function UserProfile() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { id: idParam } = useParams<{ id: string }>();
   const { isAdmin, role: viewerRole, user, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  const id = idParam || user?.id || '';
+  const isSelf = !!user && id === user.id;
+  const canView = isAdmin || isSelf;
+  const canEditRoleAndDept = isAdmin;
 
   const [fullName, setFullName] = useState('');
   const [userRole, setUserRole] = useState<UserRole>('submitter');
@@ -41,9 +46,16 @@ export default function UserProfile() {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
 
+  // Password change (self only)
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwMsg, setPwMsg] = useState<string | null>(null);
+  const [pwErr, setPwErr] = useState<string | null>(null);
+  const [pwSaving, setPwSaving] = useState(false);
+
   const { data: profile, isLoading } = useQuery({
     queryKey: ['user-profile', id],
-    enabled: !!id && isAdmin,
+    enabled: !!id && canView,
     queryFn: async (): Promise<Profile | null> => {
       if (!supabase) throw new Error('Supabase not configured');
       const { data, error } = await supabase
@@ -66,7 +78,7 @@ export default function UserProfile() {
 
   const { data: tickets } = useQuery({
     queryKey: ['user-profile-tickets', id],
-    enabled: !!id && isAdmin,
+    enabled: !!id && canView,
     queryFn: async (): Promise<Ticket[]> => {
       if (!supabase) throw new Error('Supabase not configured');
       const { data, error } = await supabase
@@ -85,9 +97,11 @@ export default function UserProfile() {
       if (!supabase) throw new Error('Supabase not configured');
       const patch: Partial<Profile> = {
         full_name: fullName.trim() || null,
-        role: userRole,
-        department: department === '' ? null : (department as Department),
       };
+      if (canEditRoleAndDept) {
+        patch.role = userRole;
+        patch.department = department === '' ? null : (department as Department);
+      }
       const { error } = await supabase.from('profiles').update(patch).eq('id', id);
       if (error) throw error;
     },
@@ -96,7 +110,7 @@ export default function UserProfile() {
       setSaveErr(null);
       queryClient.invalidateQueries({ queryKey: ['user-profile', id] });
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      if (user?.id === id) refreshProfile();
+      if (isSelf) refreshProfile();
     },
     onError: (e: Error) => {
       setSaveErr(e.message);
@@ -104,8 +118,36 @@ export default function UserProfile() {
     },
   });
 
-  if (!isAdmin) {
-    return <p className="alert-warn">Admins only. Your role: {viewerRole ?? 'unknown'}.</p>;
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwMsg(null);
+    setPwErr(null);
+    if (newPassword.length < 8) {
+      setPwErr('Password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwErr('Passwords do not match.');
+      return;
+    }
+    if (!supabase) {
+      setPwErr('Supabase not configured.');
+      return;
+    }
+    setPwSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setPwSaving(false);
+    if (error) {
+      setPwErr(error.message);
+      return;
+    }
+    setNewPassword('');
+    setConfirmPassword('');
+    setPwMsg('Password updated.');
+  }
+
+  if (!canView) {
+    return <p className="alert-warn">Not allowed. Your role: {viewerRole ?? 'unknown'}.</p>;
   }
 
   if (isLoading) return <p className="text-sm text-slate-500">Loading user…</p>;
@@ -118,13 +160,15 @@ export default function UserProfile() {
     <section>
       <div className="page-header">
         <div>
-          <button
-            type="button"
-            onClick={() => navigate('/admin/users')}
-            className="mb-2 text-sm text-slate-500 hover:underline"
-          >
-            ← Back to users
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => navigate('/admin/users')}
+              className="mb-2 text-sm text-slate-500 hover:underline"
+            >
+              ← Back to users
+            </button>
+          )}
           <h1 className="page-title">{profile.full_name ?? profile.email}</h1>
           <p className="text-sm italic text-slate-500">
             {profile.email} · joined {new Date(profile.created_at).toLocaleDateString()}
@@ -167,6 +211,7 @@ export default function UserProfile() {
             value={userRole}
             onChange={(e) => setUserRole(e.target.value as UserRole)}
             className="field-select"
+            disabled={!canEditRoleAndDept}
           >
             {ASSIGNABLE_ROLES.map((r) => (
               <option key={r} value={r}>
@@ -182,6 +227,7 @@ export default function UserProfile() {
             value={department}
             onChange={(e) => setDepartment(e.target.value as Department | '')}
             className="field-select"
+            disabled={!canEditRoleAndDept}
           >
             <option value="">— None —</option>
             {DEPARTMENTS.map((d) => (
@@ -191,7 +237,9 @@ export default function UserProfile() {
             ))}
           </select>
           <p className="mt-1 text-xs text-slate-500">
-            Used for department-scoped filters and assignment.
+            {canEditRoleAndDept
+              ? 'Used for department-scoped filters and assignment.'
+              : 'Contact an administrator to change your role or department.'}
           </p>
         </div>
 
@@ -203,6 +251,47 @@ export default function UserProfile() {
           {saveErr && <span className="text-sm text-rose-700">{saveErr}</span>}
         </div>
       </form>
+
+      {isSelf && (
+        <form onSubmit={changePassword} className="card-pad mb-6 grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Change password
+            </h2>
+          </div>
+          <div>
+            <label htmlFor="up-pw" className="field-label">New password</label>
+            <input
+              id="up-pw"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="field"
+              autoComplete="new-password"
+              minLength={8}
+            />
+          </div>
+          <div>
+            <label htmlFor="up-pw2" className="field-label">Confirm password</label>
+            <input
+              id="up-pw2"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="field"
+              autoComplete="new-password"
+              minLength={8}
+            />
+          </div>
+          <div className="md:col-span-2 flex items-center gap-3">
+            <button type="submit" disabled={pwSaving} className="btn-primary">
+              {pwSaving ? 'Updating…' : 'Update password'}
+            </button>
+            {pwMsg && <span className="text-sm text-emerald-700">{pwMsg}</span>}
+            {pwErr && <span className="text-sm text-rose-700">{pwErr}</span>}
+          </div>
+        </form>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <TicketMiniList title={`Submitted (${submitted.length})`} tickets={submitted} emptyHint="No submitted tickets." />

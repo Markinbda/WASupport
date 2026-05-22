@@ -72,12 +72,18 @@ export default function AppShell() {
               + New ticket
             </NavLink>
 
-            <div className="ml-2 hidden flex-col items-end leading-tight md:flex">
-              <span className="text-xs text-slate-300">{user?.email}</span>
+            <Link
+              to="/profile"
+              className="ml-2 hidden flex-col items-end leading-tight md:flex group"
+              title="View your profile"
+            >
+              <span className="text-xs text-slate-300 group-hover:text-white">{user?.email}</span>
               {role && (
-                <span className="text-[11px] text-slate-400">{ROLE_LABEL[role]}</span>
+                <span className="text-[11px] text-slate-400 group-hover:text-slate-200">
+                  {ROLE_LABEL[role]}
+                </span>
               )}
-            </div>
+            </Link>
 
             <button
               onClick={handleSignOut}

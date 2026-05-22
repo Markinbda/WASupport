@@ -30,6 +30,7 @@ export default function App() {
           <Route path="/queue" element={<Queue />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/users/:id" element={<UserProfile />} />
+          <Route path="/profile" element={<UserProfile />} />
           <Route path="/admin/categories" element={<AdminCategories />} />
           <Route path="/admin/locations" element={<AdminLocations />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
