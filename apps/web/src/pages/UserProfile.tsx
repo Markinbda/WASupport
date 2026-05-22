@@ -31,7 +31,7 @@ const DEPARTMENTS: Department[] = ['IT', 'FAC', 'HS'];
 
 export default function UserProfile() {
   const { id = '' } = useParams<{ id: string }>();
-  const { isAdmin, role: viewerRole } = useAuth();
+  const { isAdmin, role: viewerRole, user, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -96,6 +96,7 @@ export default function UserProfile() {
       setSaveErr(null);
       queryClient.invalidateQueries({ queryKey: ['user-profile', id] });
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      if (user?.id === id) refreshProfile();
     },
     onError: (e: Error) => {
       setSaveErr(e.message);

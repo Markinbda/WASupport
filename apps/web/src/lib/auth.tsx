@@ -12,6 +12,7 @@ type AuthCtx = {
   isManager: boolean; // admin or manager
   isStaff: boolean;   // any non-submitter
   loading: boolean;
+  refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
@@ -66,6 +67,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session?.user?.id]);
 
+  const refreshProfile = async () => {
+    if (!supabase || !session?.user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, role, department, created_at')
+      .eq('id', session.user.id)
+      .maybeSingle();
+    setProfile((data as Profile) ?? null);
+  };
+
   const role = profile?.role ?? null;
   const isAdmin = role === 'admin';
   const isManager = role === 'admin' || role === 'manager';
@@ -80,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isManager,
     isStaff,
     loading,
+    refreshProfile,
     signIn: async (email, password) => {
       if (!supabase) return { error: 'Supabase not configured' };
       const { error } = await supabase.auth.signInWithPassword({ email, password });

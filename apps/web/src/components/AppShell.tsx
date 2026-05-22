@@ -34,7 +34,7 @@ export default function AppShell() {
 
           <nav className="flex flex-wrap items-center gap-6">
             <NavLink to="/" end className={linkClass}>
-              My tickets
+              Tickets
             </NavLink>
             <NavLink to="/kb" className={linkClass}>
               Knowledge base
