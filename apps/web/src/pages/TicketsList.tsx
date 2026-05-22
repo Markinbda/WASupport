@@ -229,7 +229,11 @@ export default function TicketsList() {
                         {t.ref}
                       </Link>
                     </td>
-                    <td className="text-slate-700">{t.subject}</td>
+                    <td className="text-slate-700">
+                      <Link to={`/tickets/${t.id}`} className="hover:underline">
+                        {t.subject}
+                      </Link>
+                    </td>
                     <td className="text-slate-600">{DEPARTMENT_LABEL[t.department]}</td>
                     <td className="text-slate-700">
                       {nameFor(t.submitter_id, t.legacy_submitter_name)}
