@@ -8,6 +8,7 @@ import TicketDetail from './pages/TicketDetail';
 import StatusPage from './pages/StatusPage';
 import Queue from './pages/Queue';
 import AdminUsers from './pages/AdminUsers';
+import UserProfile from './pages/UserProfile';
 import AdminCategories from './pages/AdminCategories';
 import AdminLocations from './pages/AdminLocations';
 import AdminNotifications from './pages/AdminNotifications';
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/tickets/:id" element={<TicketDetail />} />
           <Route path="/queue" element={<Queue />} />
           <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/users/:id" element={<UserProfile />} />
           <Route path="/admin/categories" element={<AdminCategories />} />
           <Route path="/admin/locations" element={<AdminLocations />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />

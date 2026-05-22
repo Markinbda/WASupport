@@ -26,12 +26,13 @@ const FILTER_DESCRIPTIONS: Record<Filter, string> = {
 export default function TicketsList() {
   const { user, profile, isStaff } = useAuth();
   const [filter, setFilter] = useState<Filter>('mine');
+  const [search, setSearch] = useState('');
 
   const dept = profile?.department ?? null;
   const hasDept = !!dept;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['tickets', filter, user?.id, dept],
+    queryKey: ['tickets', filter, user?.id, dept, search],
     enabled: !!user,
     queryFn: async (): Promise<Ticket[]> => {
       if (!supabase) throw new Error('Supabase not configured');
@@ -55,6 +56,13 @@ export default function TicketsList() {
         q = q.eq('department', dept).in('status', CLOSED_STATUSES as unknown as string[]);
       }
       // 'all' applies no extra filter
+
+      if (search.trim()) {
+        const s = search.trim().replace(/[%_]/g, '');
+        q = q.or(
+          `subject.ilike.%${s}%,ref.ilike.%${s}%,legacy_ref.ilike.%${s}%,description.ilike.%${s}%,legacy_submitter_name.ilike.%${s}%`,
+        );
+      }
 
       const { data, error } = await q;
       if (error) throw error;
@@ -83,6 +91,13 @@ export default function TicketsList() {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="search subject / ref / description…"
+          className="field-sm w-72"
+        />
         <button
           type="button"
           onClick={() => setFilter('mine')}

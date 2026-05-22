@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
@@ -214,8 +215,16 @@ export default function AdminUsers() {
             <tbody>
               {data.map((u) => (
                 <tr key={u.id}>
-                  <td className="font-medium text-slate-800">{u.full_name ?? '—'}</td>
-                  <td className="text-slate-600">{u.email}</td>
+                  <td className="font-medium text-slate-800">
+                    <Link to={`/admin/users/${u.id}`} className="ref-link">
+                      {u.full_name ?? '—'}
+                    </Link>
+                  </td>
+                  <td className="text-slate-600">
+                    <Link to={`/admin/users/${u.id}`} className="hover:underline">
+                      {u.email}
+                    </Link>
+                  </td>
                   <td>
                     <select
                       value={u.role}
