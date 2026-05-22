@@ -222,8 +222,6 @@ export default function TicketsList() {
             </thead>
             <tbody>
               {data.map((t) => {
-                const isClosed = (CLOSED_STATUSES as readonly string[]).includes(t.status);
-                const endIso = isClosed ? t.closed_at ?? t.resolved_at : null;
                 return (
                   <tr key={t.id}>
                     <td>
@@ -251,8 +249,7 @@ export default function TicketsList() {
                       {new Date(t.created_at).toLocaleString()}
                     </td>
                     <td className="text-xs text-slate-500">
-                      {formatDuration(t.created_at, endIso)}
-                      {!isClosed && <span className="ml-1 text-slate-400">(open)</span>}
+                      {formatDuration(t.created_at, null)}
                     </td>
                   </tr>
                 );
