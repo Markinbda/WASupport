@@ -36,10 +36,11 @@ export default function AuthCallback() {
       setReady(true);
       return;
     }
+    const sb = supabase;
 
     // Give the client a moment to process the hash.
     const t = setTimeout(async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await sb.auth.getSession();
       if (!data.session) {
         // No session established — bounce to sign-in.
         navigate('/signin', { replace: true });
