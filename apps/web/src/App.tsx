@@ -16,6 +16,8 @@ import AdminNotifications from './pages/AdminNotifications';
 import KbList from './pages/KbList';
 import KbArticleView from './pages/KbArticleView';
 import KbEdit from './pages/KbEdit';
+import Dashboard from './pages/Dashboard';
+import RequireStaff from './components/RequireStaff';
 
 export default function App() {
   return (
@@ -28,6 +30,9 @@ export default function App() {
           <Route path="/new" element={<NewTicket />} />
           <Route path="/tickets/:id" element={<TicketDetail />} />
           <Route path="/queue" element={<Queue />} />
+          <Route element={<RequireStaff />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+          </Route>
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/users/:id" element={<UserProfile />} />
           <Route path="/profile" element={<UserProfile />} />

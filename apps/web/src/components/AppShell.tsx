@@ -44,6 +44,11 @@ export default function AppShell() {
                 Queue
               </NavLink>
             )}
+            {isStaff && (
+              <NavLink to="/dashboard" className={linkClass}>
+                Dashboard
+              </NavLink>
+            )}
             {isAdmin && (
               <NavLink to="/admin/users" className={linkClass}>
                 Users
