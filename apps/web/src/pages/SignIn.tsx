@@ -3,13 +3,14 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 
 export default function SignIn() {
-  const { user, signIn, signUp, loading } = useAuth();
+  const { user, signIn, signUp, signInWithMicrosoft, loading } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<'in' | 'up'>('in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [ssoBusy, setSsoBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
@@ -36,6 +37,19 @@ export default function SignIn() {
     }
   }
 
+  async function microsoftSignIn() {
+    setError(null);
+    setInfo(null);
+    setSsoBusy(true);
+    const res = await signInWithMicrosoft();
+    if (res.error) {
+      setSsoBusy(false);
+      setError(res.error);
+    }
+    // On success the browser is redirected to Microsoft, so no further state
+    // updates are needed here.
+  }
+
   const tabClass = (active: boolean) =>
     [
       'flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-200',
@@ -56,6 +70,27 @@ export default function SignIn() {
       </div>
 
       <div className="card-pad">
+        <button
+          type="button"
+          onClick={microsoftSignIn}
+          disabled={ssoBusy || busy}
+          className="mb-5 flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <svg aria-hidden="true" viewBox="0 0 23 23" className="h-4 w-4">
+            <rect x="1"  y="1"  width="10" height="10" fill="#F25022" />
+            <rect x="12" y="1"  width="10" height="10" fill="#7FBA00" />
+            <rect x="1"  y="12" width="10" height="10" fill="#00A4EF" />
+            <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
+          </svg>
+          {ssoBusy ? 'Redirecting…' : 'Sign in with Microsoft'}
+        </button>
+
+        <div className="mb-5 flex items-center gap-3 text-xs uppercase tracking-wider text-slate-400">
+          <span className="h-px flex-1 bg-slate-200" />
+          or use a password
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
+
         <div className="mb-6 flex gap-2">
           <button type="button" onClick={() => setMode('in')} className={tabClass(mode === 'in')}>
             Sign in

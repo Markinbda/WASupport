@@ -15,6 +15,7 @@ type AuthCtx = {
   refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error?: string }>;
+  signInWithMicrosoft: () => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
 };
 
@@ -103,6 +104,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
         options: { data: { full_name: fullName } },
+      });
+      return error ? { error: error.message } : {};
+    },
+    signInWithMicrosoft: async () => {
+      if (!supabase) return { error: 'Supabase not configured' };
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'azure',
+        options: {
+          scopes: 'openid email profile offline_access',
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
       return error ? { error: error.message } : {};
     },
