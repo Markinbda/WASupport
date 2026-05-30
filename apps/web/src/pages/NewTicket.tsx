@@ -11,6 +11,7 @@ import {
   type KbArticle,
   type Location,
 } from '../lib/types';
+import { VIDEO_TAG_LABEL, type Video, type VideoTag } from '../lib/videos';
 
 const MAX_IMAGES = 3;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MiB
@@ -23,6 +24,7 @@ const ALLOWED_IMAGE_TYPES = [
 ];
 
 type KbHit = Pick<KbArticle, 'id' | 'slug' | 'title' | 'summary' | 'department' | 'tags'>;
+type VideoHit = Pick<Video, 'id' | 'title' | 'description' | 'tags' | 'thumbnail_url'>;
 
 export default function NewTicket() {
   const { user } = useAuth();
@@ -146,6 +148,63 @@ export default function NewTicket() {
         const bDept = b.department === department ? 0 : 1;
         return aDept - bDept;
       });
+      return merged;
+    },
+  });
+
+  // Video lookahead: same debounced subject, search published videos.
+  const videoQ = useQuery({
+    queryKey: ['video-suggest', debouncedSubject],
+    enabled: debouncedSubject.length >= 3,
+    queryFn: async (): Promise<VideoHit[]> => {
+      if (!supabase) return [];
+      const q = debouncedSubject;
+      const tokens = q
+        .split(/\s+/)
+        .map((t) => t.replace(/[%_,()]/g, ''))
+        .filter((t) => t.length >= 2);
+
+      const select = 'id, title, description, tags, thumbnail_url';
+
+      let primary: VideoHit[] = [];
+      try {
+        const { data } = await supabase
+          .from('videos')
+          .select(select)
+          .eq('status', 'published')
+          .textSearch('search_tsv', q, { type: 'websearch', config: 'english' })
+          .limit(6);
+        primary = (data ?? []) as VideoHit[];
+      } catch {
+        primary = [];
+      }
+
+      let fallback: VideoHit[] = [];
+      if (primary.length < 4 && tokens.length > 0) {
+        const orClause = tokens
+          .flatMap((tok) => [`title.ilike.%${tok}%`, `description.ilike.%${tok}%`])
+          .join(',');
+        try {
+          const { data } = await supabase
+            .from('videos')
+            .select(select)
+            .eq('status', 'published')
+            .or(orClause)
+            .limit(6);
+          fallback = (data ?? []) as VideoHit[];
+        } catch {
+          fallback = [];
+        }
+      }
+
+      const seen = new Set<string>();
+      const merged: VideoHit[] = [];
+      for (const v of [...primary, ...fallback]) {
+        if (seen.has(v.id)) continue;
+        seen.add(v.id);
+        merged.push(v);
+        if (merged.length >= 4) break;
+      }
       return merged;
     },
   });
@@ -483,8 +542,8 @@ export default function NewTicket() {
               Searching for answers
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              We&apos;ll look in the knowledge base as you type the subject — your
-              issue may already have an answer.
+              We&apos;ll look in the knowledge base and video library as you type the
+              subject — your issue may already have an answer.
             </p>
 
             {debouncedSubject.length < 3 && (
@@ -499,39 +558,99 @@ export default function NewTicket() {
 
             {debouncedSubject.length >= 3 &&
               !kbQ.isLoading &&
-              (kbQ.data?.length ?? 0) === 0 && (
+              (kbQ.data?.length ?? 0) === 0 &&
+              (videoQ.data?.length ?? 0) === 0 && (
                 <p className="mt-4 text-sm text-slate-500">
-                  No matching articles. Submitting a ticket is the way to go.
+                  No matching articles or videos. Submitting a ticket is the way to go.
                 </p>
               )}
 
             {kbQ.data && kbQ.data.length > 0 && (
-              <ul className="mt-3 space-y-2">
-                {kbQ.data.map((a) => (
-                  <li key={a.id}>
-                    <Link
-                      to={`/kb/${a.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block rounded-md border border-slate-200 bg-white p-3 text-sm hover:border-slate-300 hover:bg-slate-50"
-                    >
-                      <div className="flex items-center gap-2">
-                        {a.department && (
-                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
-                            {DEPARTMENT_LABEL[a.department]}
-                          </span>
+              <>
+                <h3 className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Articles
+                </h3>
+                <ul className="mt-2 space-y-2">
+                  {kbQ.data.map((a) => (
+                    <li key={a.id}>
+                      <Link
+                        to={`/kb/${a.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block rounded-md border border-slate-200 bg-white p-3 text-sm hover:border-slate-300 hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-2">
+                          {a.department && (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
+                              {DEPARTMENT_LABEL[a.department]}
+                            </span>
+                          )}
+                          <span className="font-medium text-slate-900">{a.title}</span>
+                        </div>
+                        {a.summary && (
+                          <p className="mt-1 line-clamp-2 text-xs text-slate-600">
+                            {a.summary}
+                          </p>
                         )}
-                        <span className="font-medium text-slate-900">{a.title}</span>
-                      </div>
-                      {a.summary && (
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-600">
-                          {a.summary}
-                        </p>
-                      )}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {videoQ.data && videoQ.data.length > 0 && (
+              <>
+                <h3 className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Videos
+                </h3>
+                <ul className="mt-2 space-y-2">
+                  {videoQ.data.map((v) => (
+                    <li key={v.id}>
+                      <Link
+                        to={`/videos/${v.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex gap-3 rounded-md border border-slate-200 bg-white p-2 text-sm hover:border-slate-300 hover:bg-slate-50"
+                      >
+                        <div className="relative h-12 w-20 flex-shrink-0 overflow-hidden rounded bg-slate-100">
+                          {v.thumbnail_url ? (
+                            <img
+                              src={v.thumbnail_url}
+                              alt=""
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-slate-400">
+                              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                                <path d="M8 5v14l11-7z" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-sm font-medium text-slate-900">
+                            {v.title}
+                          </p>
+                          {v.tags.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {v.tags.slice(0, 3).map((t) => (
+                                <span
+                                  key={t}
+                                  className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-slate-600"
+                                >
+                                  {VIDEO_TAG_LABEL[t as VideoTag] ?? t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
 
             <Link
@@ -539,6 +658,12 @@ export default function NewTicket() {
               className="mt-4 inline-block text-xs font-medium text-blue-700 hover:underline"
             >
               Browse the full knowledge base →
+            </Link>
+            <Link
+              to="/videos"
+              className="mt-1 block text-xs font-medium text-blue-700 hover:underline"
+            >
+              Browse the video library →
             </Link>
           </div>
         </aside>
