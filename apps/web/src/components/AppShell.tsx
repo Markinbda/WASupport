@@ -34,10 +34,16 @@ export default function AppShell() {
 
           <nav className="flex flex-wrap items-center gap-6">
             <NavLink to="/" end className={linkClass}>
+              Home
+            </NavLink>
+            <NavLink to="/tickets" className={linkClass}>
               Tickets
             </NavLink>
             <NavLink to="/kb" className={linkClass}>
               Knowledge base
+            </NavLink>
+            <NavLink to="/videos" className={linkClass}>
+              Videos
             </NavLink>
             {isStaff && (
               <NavLink to="/queue" className={linkClass}>

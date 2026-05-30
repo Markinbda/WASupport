@@ -17,6 +17,10 @@ import KbList from './pages/KbList';
 import KbArticleView from './pages/KbArticleView';
 import KbEdit from './pages/KbEdit';
 import Dashboard from './pages/Dashboard';
+import Home from './pages/Home';
+import VideoLibrary from './pages/VideoLibrary';
+import VideoView from './pages/VideoView';
+import VideoEdit from './pages/VideoEdit';
 import RequireStaff from './components/RequireStaff';
 
 export default function App() {
@@ -26,7 +30,8 @@ export default function App() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          <Route path="/" element={<TicketsList />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/tickets" element={<TicketsList />} />
           <Route path="/new" element={<NewTicket />} />
           <Route path="/tickets/:id" element={<TicketDetail />} />
           <Route path="/queue" element={<Queue />} />
@@ -43,6 +48,10 @@ export default function App() {
           <Route path="/kb/new" element={<KbEdit />} />
           <Route path="/kb/:slug" element={<KbArticleView />} />
           <Route path="/kb/:slug/edit" element={<KbEdit />} />
+          <Route path="/videos" element={<VideoLibrary />} />
+          <Route path="/videos/new" element={<VideoEdit />} />
+          <Route path="/videos/:id" element={<VideoView />} />
+          <Route path="/videos/:id/edit" element={<VideoEdit />} />
           <Route path="/status" element={<StatusPage />} />
         </Route>
       </Route>
