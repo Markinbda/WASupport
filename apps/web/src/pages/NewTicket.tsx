@@ -381,14 +381,22 @@ export default function NewTicket() {
               <label htmlFor="building" className="field-label">
                 Building
               </label>
-              <input
+              <select
                 id="building"
-                type="text"
                 value={building}
                 onChange={(e) => setBuilding(e.target.value)}
-                placeholder="e.g. Main School"
-                className="field w-full"
-              />
+                className="field-select w-full"
+              >
+                <option value="">Select a building…</option>
+                <option value="Primary">Primary</option>
+                <option value="Secondary">Secondary</option>
+                <option value="Main Building">Main Building</option>
+                <option value="N. Building">N. Building</option>
+                <option value="Science Building">Science Building</option>
+                <option value="Gymnasium">Gymnasium</option>
+                <option value="Pavilion">Pavilion</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
 
             <div>
