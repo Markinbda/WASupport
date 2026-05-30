@@ -41,6 +41,8 @@ export interface Ticket {
   submitter_id: string | null;
   assignee_id: string | null;
   location_id: string | null;
+  building: string | null;
+  room: string | null;
   created_at: string;
   updated_at: string;
   resolved_at: string | null;

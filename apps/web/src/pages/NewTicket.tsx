@@ -9,7 +9,6 @@ import {
   type Category,
   type Department,
   type KbArticle,
-  type Location,
 } from '../lib/types';
 import { VIDEO_TAG_LABEL, type Video, type VideoTag } from '../lib/videos';
 
@@ -34,7 +33,8 @@ export default function NewTicket() {
   const [department, setDepartment] = useState<Department>('IT');
   const [categoryId, setCategoryId] = useState<string>('');
   const [subcategoryId, setSubcategoryId] = useState<string>('');
-  const [locationId, setLocationId] = useState<string>('');
+  const [building, setBuilding] = useState<string>('');
+  const [room, setRoom] = useState<string>('');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [images, setImages] = useState<File[]>([]);
@@ -68,20 +68,6 @@ export default function NewTicket() {
         .order('name');
       if (error) throw error;
       return data as Category[];
-    },
-  });
-
-  const locationsQ = useQuery({
-    queryKey: ['locations'],
-    queryFn: async (): Promise<Location[]> => {
-      if (!supabase) throw new Error('Supabase not configured');
-      const { data, error } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('is_active', true)
-        .order('building');
-      if (error) throw error;
-      return data as Location[];
     },
   });
 
@@ -219,7 +205,8 @@ export default function NewTicket() {
           department,
           category_id: categoryId || null,
           subcategory_id: subcategoryId || null,
-          location_id: locationId || null,
+          building: building.trim() || null,
+          room: room.trim() || null,
           subject,
           description,
           submitter_id: user.id,
@@ -391,15 +378,30 @@ export default function NewTicket() {
             </div>
 
             <div>
-              <label htmlFor="location" className="field-label">
-                Location
+              <label htmlFor="building" className="field-label">
+                Building
               </label>
-              <Combobox
-                id="location"
-                options={(locationsQ.data ?? []).map((l) => ({ value: l.id, label: l.label }))}
-                value={locationId}
-                onChange={setLocationId}
-                placeholder="Type to search locations…"
+              <input
+                id="building"
+                type="text"
+                value={building}
+                onChange={(e) => setBuilding(e.target.value)}
+                placeholder="e.g. Main School"
+                className="field w-full"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="room" className="field-label">
+                Room
+              </label>
+              <input
+                id="room"
+                type="text"
+                value={room}
+                onChange={(e) => setRoom(e.target.value)}
+                placeholder="e.g. 101"
+                className="field w-full"
               />
             </div>
           </div>

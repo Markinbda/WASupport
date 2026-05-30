@@ -232,7 +232,15 @@ export default function TicketDetail() {
               <dd className="mt-1 text-slate-700">{t.legacy_assignee_name}</dd>
             </div>
           )}
-          {t.legacy_location && (
+          {(t.building || t.room) && (
+            <div>
+              <dt className="section-title">Location</dt>
+              <dd className="mt-1 text-slate-700">
+                {[t.building, t.room].filter(Boolean).join(' · ')}
+              </dd>
+            </div>
+          )}
+          {t.legacy_location && !t.building && !t.room && (
             <div>
               <dt className="section-title">Location</dt>
               <dd className="mt-1 text-slate-700">{t.legacy_location}</dd>
