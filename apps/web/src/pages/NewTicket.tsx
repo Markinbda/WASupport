@@ -3,10 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
-import { Combobox } from '../components/Combobox';
 import {
   DEPARTMENT_LABEL,
-  type Category,
   type Department,
   type KbArticle,
 } from '../lib/types';
@@ -31,8 +29,6 @@ export default function NewTicket() {
   const queryClient = useQueryClient();
 
   const [department, setDepartment] = useState<Department>('IT');
-  const [categoryId, setCategoryId] = useState<string>('');
-  const [subcategoryId, setSubcategoryId] = useState<string>('');
   const [building, setBuilding] = useState<string>('');
   const [room, setRoom] = useState<string>('');
   const [subject, setSubject] = useState('');
@@ -56,20 +52,6 @@ export default function NewTicket() {
     setPreviews(urls);
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [images]);
-
-  const categoriesQ = useQuery({
-    queryKey: ['categories'],
-    queryFn: async (): Promise<Category[]> => {
-      if (!supabase) throw new Error('Supabase not configured');
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-      if (error) throw error;
-      return data as Category[];
-    },
-  });
 
   // Knowledge-base lookahead: search published articles based on the subject
   // (and optionally department) so the submitter can self-serve before filing.
@@ -203,8 +185,6 @@ export default function NewTicket() {
         .from('tickets')
         .insert({
           department,
-          category_id: categoryId || null,
-          subcategory_id: subcategoryId || null,
           building: building.trim() || null,
           room: room.trim() || null,
           subject,
@@ -260,18 +240,6 @@ export default function NewTicket() {
     onError: (e: Error) => setError(e.message),
   });
 
-  const filteredCategories = useMemo(
-    () =>
-      categoriesQ.data?.filter(
-        (c) => c.department === department && c.parent_id === null,
-      ) ?? [],
-    [categoriesQ.data, department],
-  );
-  const filteredSubcategories = useMemo(
-    () => categoriesQ.data?.filter((c) => c.parent_id === categoryId) ?? [],
-    [categoriesQ.data, categoryId],
-  );
-
   const handleFilesPicked = (incoming: FileList | null) => {
     if (!incoming || incoming.length === 0) return;
     const next: File[] = [...images];
@@ -326,11 +294,7 @@ export default function NewTicket() {
               <select
                 id="department"
                 value={department}
-                onChange={(e) => {
-                  setDepartment(e.target.value as Department);
-                  setCategoryId('');
-                  setSubcategoryId('');
-                }}
+                onChange={(e) => setDepartment(e.target.value as Department)}
                 className="field-select"
               >
                 {(Object.keys(DEPARTMENT_LABEL) as Department[]).map((d) => (
@@ -339,42 +303,6 @@ export default function NewTicket() {
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label htmlFor="category" className="field-label">
-                Category
-              </label>
-              <Combobox
-                id="category"
-                options={filteredCategories.map((c) => ({ value: c.id, label: c.name }))}
-                value={categoryId}
-                onChange={(v) => {
-                  setCategoryId(v);
-                  setSubcategoryId('');
-                }}
-                placeholder="Type to search categories…"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="subcategory" className="field-label">
-                Subcategory
-              </label>
-              <Combobox
-                id="subcategory"
-                key={categoryId || 'none'}
-                options={filteredSubcategories.map((c) => ({ value: c.id, label: c.name }))}
-                value={subcategoryId}
-                onChange={setSubcategoryId}
-                placeholder={
-                  categoryId
-                    ? filteredSubcategories.length
-                      ? 'Type to search subcategories…'
-                      : 'No subcategories — leave blank'
-                    : 'Select a category first'
-                }
-              />
             </div>
 
             <div>
