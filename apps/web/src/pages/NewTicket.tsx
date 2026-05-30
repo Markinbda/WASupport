@@ -39,6 +39,7 @@ export default function NewTicket() {
   const [previews, setPreviews] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   // Debounce the subject so KB lookups don't fire on every keystroke.
   const [debouncedSubject, setDebouncedSubject] = useState('');
@@ -248,6 +249,7 @@ export default function NewTicket() {
     if (rejected.length > 0) setError(rejected.join('; '));
     else setError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
   const removeImage = (idx: number) => {
@@ -390,8 +392,46 @@ export default function NewTicket() {
               multiple
               disabled={images.length >= MAX_IMAGES}
               onChange={(e) => handleFilesPicked(e.target.files)}
-              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+              className="sr-only"
             />
+            <input
+              id="images-camera"
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              disabled={images.length >= MAX_IMAGES}
+              onChange={(e) => handleFilesPicked(e.target.files)}
+              className="sr-only"
+            />
+            <div className="mt-1 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={images.length >= MAX_IMAGES}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4-4 4 4 4-4 4 4M4 6h16v12H4z" />
+                </svg>
+                Choose picture
+              </button>
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={images.length >= MAX_IMAGES}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h3l2-2h8l2 2h3v12H3V7z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+                Take photo
+              </button>
+              <span className="self-center text-xs text-slate-500">
+                {images.length} / {MAX_IMAGES} selected
+              </span>
+            </div>
             {previews.length > 0 && (
               <ul className="mt-3 grid grid-cols-3 gap-3">
                 {previews.map((src, i) => (
