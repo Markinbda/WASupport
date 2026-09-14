@@ -9,6 +9,7 @@ type AuthCtx = {
   profile: Profile | null;
   role: UserRole | null;
   isAdmin: boolean;
+  isAvAdmin: boolean;
   isManager: boolean; // admin or manager
   isStaff: boolean;   // any non-submitter
   loading: boolean;
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const role = profile?.role ?? null;
   const isAdmin = role === 'admin';
+  const isAvAdmin = role === 'av_admin';
   const isManager = role === 'admin' || role === 'manager';
   const isStaff = role !== null && STAFF_ROLES.includes(role);
 
@@ -89,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     role,
     isAdmin,
+    isAvAdmin,
     isManager,
     isStaff,
     loading,
@@ -112,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'azure',
         options: {
-          scopes: 'openid email profile offline_access',
+          scopes: 'openid email profile offline_access Calendars.ReadWrite',
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });

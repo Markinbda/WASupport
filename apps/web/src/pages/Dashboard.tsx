@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   Bar,
   BarChart,
@@ -18,7 +19,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { DEPARTMENT_LABEL, type Department } from '../lib/types';
 
-type Range = 7 | 30;
+type RangePreset = 7 | 30 | 'custom';
 
 type FlowRow = { day: string; department: string; opened: number; closed: number };
 type Kpis = {
@@ -42,10 +43,13 @@ const CATEGORY_COLORS = [
 ];
 
 function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-function rangeBounds(days: Range): { from: string; to: string } {
+function rangeBounds(days: 7 | 30): { from: string; to: string } {
   const to = new Date();
   const from = new Date();
   from.setDate(to.getDate() - (days - 1));
@@ -70,25 +74,66 @@ function KpiTile({
   label,
   value,
   previous,
+  to,
 }: {
   label: string;
   value: number;
   previous?: number;
+  to: string;
 }) {
   return (
-    <div className="card-pad">
+    <Link
+      to={to}
+      className="card-pad block transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy focus-visible:ring-offset-2"
+    >
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-2 flex items-baseline text-3xl font-semibold text-slate-900">
         {value}
         {previous !== undefined && <DeltaArrow current={value} previous={previous} />}
       </p>
-    </div>
+      <p className="mt-3 text-xs font-medium text-brand-navy">View tickets →</p>
+    </Link>
   );
 }
 
 export default function Dashboard() {
-  const [range, setRange] = useState<Range>(7);
-  const { from, to } = useMemo(() => rangeBounds(range), [range]);
+  const initialRange = rangeBounds(7);
+  const [range, setRange] = useState<RangePreset>(7);
+  const [from, setFrom] = useState(initialRange.from);
+  const [to, setTo] = useState(initialRange.to);
+  const [draftFrom, setDraftFrom] = useState(initialRange.from);
+  const [draftTo, setDraftTo] = useState(initialRange.to);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+
+  function selectPreset(days: 7 | 30) {
+    const bounds = rangeBounds(days);
+    setRange(days);
+    setFrom(bounds.from);
+    setTo(bounds.to);
+    setDraftFrom(bounds.from);
+    setDraftTo(bounds.to);
+    setRangeError(null);
+  }
+
+  function applyCustomRange() {
+    if (!draftFrom || !draftTo) {
+      setRangeError('Select both a start date and an end date.');
+      return;
+    }
+    if (draftFrom > draftTo) {
+      setRangeError('The start date must be on or before the end date.');
+      return;
+    }
+    const days = Math.floor((Date.parse(draftTo) - Date.parse(draftFrom)) / 86_400_000) + 1;
+    if (days > 180) {
+      setRangeError('Select a range of 180 days or fewer.');
+      return;
+    }
+    setRange('custom');
+    setFrom(draftFrom);
+    setTo(draftTo);
+    setRangeError(null);
+  }
 
   const kpisQ = useQuery({
     queryKey: ['dashboard-kpis', from, to],
@@ -172,6 +217,8 @@ export default function Dashboard() {
     (flowQ.error as Error | null)?.message ??
     (categoryQ.error as Error | null)?.message ??
     null;
+  const drilldownUrl = (metric: 'new' | 'open' | 'unassigned' | 'resolved') =>
+    `/queue?view=${metric}&from=${from}&to=${to}`;
 
   return (
     <section>
@@ -180,25 +227,58 @@ export default function Dashboard() {
           <h1 className="page-title">Dashboard</h1>
           <p className="page-subtitle">Tech-team view of ticket activity.</p>
         </div>
-        <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5 text-sm">
-          {([7, 30] as const).map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRange(r)}
-              className={
-                'rounded px-3 py-1.5 ' +
-                (range === r
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:text-slate-900')
-              }
-            >
-              Last {r} days
-            </button>
-          ))}
+        <div className="flex flex-wrap items-end justify-end gap-2">
+          <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5 text-sm">
+            {([7, 30] as const).map((days) => (
+              <button
+                key={days}
+                type="button"
+                onClick={() => selectPreset(days)}
+                className={
+                  'rounded px-3 py-1.5 ' +
+                  (range === days
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:text-slate-900')
+                }
+              >
+                Last {days} days
+              </button>
+            ))}
+          </div>
+          <div>
+            <label htmlFor="dashboard-from" className="mb-1 block text-[11px] font-semibold uppercase text-slate-500">
+              From
+            </label>
+            <input
+              id="dashboard-from"
+              type="date"
+              value={draftFrom}
+              max={draftTo || undefined}
+              onChange={(event) => setDraftFrom(event.target.value)}
+              className="field-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="dashboard-to" className="mb-1 block text-[11px] font-semibold uppercase text-slate-500">
+              To
+            </label>
+            <input
+              id="dashboard-to"
+              type="date"
+              value={draftTo}
+              min={draftFrom || undefined}
+              max={isoDate(new Date())}
+              onChange={(event) => setDraftTo(event.target.value)}
+              className="field-sm"
+            />
+          </div>
+          <button type="button" onClick={applyCustomRange} className="btn-primary px-4 py-2">
+            Apply
+          </button>
         </div>
       </div>
 
+      {rangeError && <p className="mb-4 alert-error">{rangeError}</p>}
       {errMsg && <p className="mb-4 alert-error">{errMsg}</p>}
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -206,13 +286,23 @@ export default function Dashboard() {
           label="New tickets"
           value={kpisQ.data?.new_tickets ?? 0}
           previous={kpisQ.data?.new_tickets_prev}
+          to={drilldownUrl('new')}
         />
-        <KpiTile label="Open" value={kpisQ.data?.open_tickets ?? 0} />
-        <KpiTile label="Unassigned" value={kpisQ.data?.unassigned ?? 0} />
+        <KpiTile
+          label="Open at period end"
+          value={kpisQ.data?.open_tickets ?? 0}
+          to={drilldownUrl('open')}
+        />
+        <KpiTile
+          label="Unassigned at period end"
+          value={kpisQ.data?.unassigned ?? 0}
+          to={drilldownUrl('unassigned')}
+        />
         <KpiTile
           label="Resolved"
           value={kpisQ.data?.resolved_tickets ?? 0}
           previous={kpisQ.data?.resolved_prev}
+          to={drilldownUrl('resolved')}
         />
       </div>
 

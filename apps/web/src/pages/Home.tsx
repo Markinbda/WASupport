@@ -40,6 +40,16 @@ const TILES: Tile[] = [
       </svg>
     ),
   },
+  {
+    to: '/av-request',
+    title: 'AV Request',
+    description: 'Request audio/visual support for an event or class.',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="h-10 w-10">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16v10H4zM8 17l-2 4m10-4 2 4M9 11h6m-3-4V3" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Home() {
@@ -57,7 +67,7 @@ export default function Home() {
         </p>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {TILES.map((t) => (
           <Link
             key={t.to}

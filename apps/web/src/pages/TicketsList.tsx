@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -13,8 +13,28 @@ import {
 } from '../lib/types';
 
 type Filter = 'mine' | 'all' | 'open_dept' | 'closed_dept';
+type SortKey =
+  | 'ref'
+  | 'subject'
+  | 'department'
+  | 'submitter'
+  | 'assignee'
+  | 'priority'
+  | 'status'
+  | 'opened'
+  | 'duration';
+type SortDirection = 'asc' | 'desc';
 
 const CLOSED_STATUSES = ['resolved', 'closed'] as const;
+const PRIORITY_ORDER = { low: 0, normal: 1, high: 2, critical: 3, urgent: 4 } as const;
+const STATUS_ORDER = {
+  awaiting_triage: 0,
+  open: 1,
+  in_progress: 2,
+  on_hold: 3,
+  resolved: 4,
+  closed: 5,
+} as const;
 
 const FILTER_DESCRIPTIONS: Record<Filter, string> = {
   mine: 'Tickets assigned to or submitted by you.',
@@ -46,6 +66,8 @@ export default function TicketsList() {
   const { user, profile, isStaff } = useAuth();
   const [filter, setFilter] = useState<Filter>('mine');
   const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('opened');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const dept = profile?.department ?? null;
   const hasDept = !!dept;
@@ -119,6 +141,62 @@ export default function TicketsList() {
     if (id && people && people[id]) return people[id];
     return fallback ?? '—';
   };
+
+  const sortedTickets = useMemo(() => {
+    const tickets = [...(data ?? [])];
+    const textCompare = (left: string, right: string) =>
+      left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
+    const valueFor = (ticket: Ticket): string | number => {
+      switch (sortKey) {
+        case 'ref': return ticket.ref;
+        case 'subject': return ticket.subject;
+        case 'department': return DEPARTMENT_LABEL[ticket.department];
+        case 'submitter': return nameFor(ticket.submitter_id, ticket.legacy_submitter_name);
+        case 'assignee': return nameFor(ticket.assignee_id, ticket.legacy_assignee_name);
+        case 'priority': return PRIORITY_ORDER[ticket.priority];
+        case 'status': return STATUS_ORDER[ticket.status];
+        case 'opened': return new Date(ticket.created_at).getTime();
+        case 'duration': return Date.now() - new Date(ticket.created_at).getTime();
+      }
+    };
+    tickets.sort((left, right) => {
+      const leftValue = valueFor(left);
+      const rightValue = valueFor(right);
+      const comparison =
+        typeof leftValue === 'number' && typeof rightValue === 'number'
+          ? leftValue - rightValue
+          : textCompare(String(leftValue), String(rightValue));
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return tickets;
+  }, [data, people, sortDirection, sortKey]);
+
+  function changeSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDirection((direction) => (direction === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDirection(key === 'opened' || key === 'duration' ? 'desc' : 'asc');
+    }
+  }
+
+  function SortHeading({ column, children }: { column: SortKey; children: string }) {
+    const active = sortKey === column;
+    return (
+      <th aria-sort={active ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+        <button
+          type="button"
+          onClick={() => changeSort(column)}
+          className="inline-flex items-center gap-1 text-left hover:text-slate-900"
+        >
+          <span>{children}</span>
+          <span className={active ? 'text-slate-800' : 'text-slate-300'} aria-hidden="true">
+            {active ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+          </span>
+        </button>
+      </th>
+    );
+  }
 
   const pillBase =
     'rounded-full border px-3 py-1 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-1';
@@ -209,19 +287,19 @@ export default function TicketsList() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Ref</th>
-                <th>Subject</th>
-                <th>Department</th>
-                <th>Submitted by</th>
-                <th>Assigned to</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Opened</th>
-                <th>Duration</th>
+                <SortHeading column="ref">Ref</SortHeading>
+                <SortHeading column="subject">Subject</SortHeading>
+                <SortHeading column="department">Department</SortHeading>
+                <SortHeading column="submitter">Submitted by</SortHeading>
+                <SortHeading column="assignee">Assigned to</SortHeading>
+                <SortHeading column="priority">Priority</SortHeading>
+                <SortHeading column="status">Status</SortHeading>
+                <SortHeading column="opened">Opened</SortHeading>
+                <SortHeading column="duration">Duration</SortHeading>
               </tr>
             </thead>
             <tbody>
-              {data.map((t) => {
+              {sortedTickets.map((t) => {
                 return (
                   <tr key={t.id}>
                     <td>

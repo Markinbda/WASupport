@@ -22,6 +22,7 @@ const ASSIGNABLE_ROLES: UserRole[] = [
   'it_tech',
   'fac_tech',
   'hs_officer',
+  'av_admin',
   'manager',
   'leadership',
   'admin',

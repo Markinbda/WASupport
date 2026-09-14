@@ -277,7 +277,7 @@ export default function TicketDetail() {
         {isStaff && t.status === 'awaiting_triage' && (
           <div className="mt-6 rounded-lg border border-rose-200 bg-rose-50 p-4">
             <div className="mb-3 flex items-center gap-2">
-              <span className="badge-triage">Needs triage</span>
+              <span className="badge-triage">Needs review</span>
               <p className="text-sm text-rose-900">
                 Set a priority and assign someone to start the SLA clock.
               </p>

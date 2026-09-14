@@ -136,7 +136,7 @@ export default function VideoLibrary() {
                   src={v.thumbnail_url}
                   alt=""
                   loading="lazy"
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-slate-400">

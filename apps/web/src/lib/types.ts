@@ -14,6 +14,7 @@ export type UserRole =
   | 'it_tech'
   | 'fac_tech'
   | 'hs_officer'
+  | 'av_admin'
   | 'support'
   | 'manager'
   | 'admin'
@@ -101,7 +102,7 @@ export const PRIORITY_LABEL: Record<TicketPriority, string> = {
 };
 
 export const STATUS_LABEL: Record<TicketStatus, string> = {
-  awaiting_triage: 'Awaiting triage',
+  awaiting_triage: 'Needs review',
   open: 'Open',
   in_progress: 'In progress',
   on_hold: 'On hold',
@@ -114,6 +115,7 @@ export const ROLE_LABEL: Record<UserRole, string> = {
   it_tech: 'IT Technician',
   fac_tech: 'Facilities Technician',
   hs_officer: 'H&S Officer',
+  av_admin: 'Audio Visual Admin',
   support: 'Support (close only)',
   manager: 'Manager',
   admin: 'Administrator',

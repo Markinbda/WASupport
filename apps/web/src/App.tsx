@@ -22,6 +22,10 @@ import VideoLibrary from './pages/VideoLibrary';
 import VideoView from './pages/VideoView';
 import VideoEdit from './pages/VideoEdit';
 import RequireStaff from './components/RequireStaff';
+import RequireAvAdmin from './components/RequireAvAdmin';
+import AdminTicketImport from './pages/AdminTicketImport';
+import AvRequest from './pages/AvRequest';
+import AvAdmin from './pages/AvAdmin';
 
 export default function App() {
   return (
@@ -33,10 +37,14 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/tickets" element={<TicketsList />} />
           <Route path="/new" element={<NewTicket />} />
+          <Route path="/av-request" element={<AvRequest />} />
           <Route path="/tickets/:id" element={<TicketDetail />} />
           <Route path="/queue" element={<Queue />} />
           <Route element={<RequireStaff />}>
             <Route path="/dashboard" element={<Dashboard />} />
+          </Route>
+          <Route element={<RequireAvAdmin />}>
+            <Route path="/admin/av" element={<AvAdmin />} />
           </Route>
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/users/:id" element={<UserProfile />} />
@@ -44,6 +52,7 @@ export default function App() {
           <Route path="/admin/categories" element={<AdminCategories />} />
           <Route path="/admin/locations" element={<AdminLocations />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
+          <Route path="/admin/import" element={<AdminTicketImport />} />
           <Route path="/kb" element={<KbList />} />
           <Route path="/kb/new" element={<KbEdit />} />
           <Route path="/kb/:slug" element={<KbArticleView />} />

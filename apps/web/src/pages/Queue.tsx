@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
@@ -16,28 +16,56 @@ import {
 } from '../lib/types';
 
 const PAGE_SIZE = 50;
+type DashboardView = 'new' | 'open' | 'unassigned' | 'resolved';
+
+const DASHBOARD_VIEW_LABEL: Record<DashboardView, string> = {
+  new: 'New tickets',
+  open: 'Open at period end',
+  unassigned: 'Unassigned at period end',
+  resolved: 'Resolved tickets',
+};
+
+function isDashboardView(value: string | null): value is DashboardView {
+  return value !== null && ['new', 'open', 'unassigned', 'resolved'].includes(value);
+}
+
+function isIsoDate(value: string | null): value is string {
+  return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
 
 export default function Queue() {
   const { isStaff, role } = useAuth();
+  const [searchParams] = useSearchParams();
   const [dept, setDept] = useState<Department | 'ALL'>('ALL');
   const [status, setStatus] = useState<TicketStatus | 'ALL'>('open');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
+  const viewParam = searchParams.get('view');
+  const fromParam = searchParams.get('from');
+  const toParam = searchParams.get('to');
+  const dashboardView = isDashboardView(viewParam) && isIsoDate(fromParam) && isIsoDate(toParam)
+    ? viewParam
+    : null;
 
-  const queryKey = ['queue', dept, status, search, page];
+  const queryKey = ['queue', dept, status, search, page, dashboardView, fromParam, toParam];
 
   const { data, isLoading, error } = useQuery({
     queryKey,
     enabled: isStaff,
     queryFn: async () => {
       if (!supabase) throw new Error('Supabase not configured');
-      let q = supabase
-        .from('tickets')
-        .select('*', { count: 'exact' })
+      let q = dashboardView
+        ? supabase.rpc(
+            'dashboard_ticket_drilldown',
+            { metric: dashboardView, from_date: fromParam!, to_date: toParam! },
+            { count: 'exact' },
+          )
+        : supabase.from('tickets').select('*', { count: 'exact' });
+      q = q
         .order('created_at', { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
       if (dept !== 'ALL') q = q.eq('department', dept);
-      if (status !== 'ALL') q = q.eq('status', status);
+      if (!dashboardView && status !== 'ALL') q = q.eq('status', status);
       if (search.trim()) {
         const s = search.trim().replace(/[%_]/g, '');
         q = q.or(
@@ -69,8 +97,16 @@ export default function Queue() {
         <div>
           <h1 className="page-title">Ticket queue</h1>
           <p className="text-sm italic text-slate-500">
+            {dashboardView
+              ? `${DASHBOARD_VIEW_LABEL[dashboardView]} from ${fromParam} to ${toParam}. `
+              : ''}
             Showing {data?.rows.length ?? 0} of {data?.count ?? 0}
           </p>
+          {status === 'awaiting_triage' && !dashboardView && (
+            <p className="mt-1 text-xs text-slate-500">
+              Needs review means staff must check the request, set its priority, and assign it before work starts.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
@@ -86,22 +122,28 @@ export default function Queue() {
             <option value="FAC">Facilities</option>
             <option value="HS">Health &amp; Safety</option>
           </select>
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value as TicketStatus | 'ALL');
-              setPage(0);
-            }}
-            className="field-select-sm"
-          >
-            <option value="ALL">All statuses</option>
-            <option value="awaiting_triage">Needs triage</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In progress</option>
-            <option value="on_hold">On hold</option>
-            <option value="resolved">Resolved</option>
-            <option value="closed">Closed</option>
-          </select>
+          {dashboardView ? (
+            <Link to="/dashboard" className="btn-ghost px-4 py-2 text-xs">
+              Back to dashboard
+            </Link>
+          ) : (
+            <select
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value as TicketStatus | 'ALL');
+                setPage(0);
+              }}
+              className="field-select-sm"
+            >
+              <option value="ALL">All statuses</option>
+              <option value="awaiting_triage">Needs review</option>
+              <option value="open">Open</option>
+              <option value="in_progress">In progress</option>
+              <option value="on_hold">On hold</option>
+              <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
+            </select>
+          )}
           <input
             value={search}
             onChange={(e) => {

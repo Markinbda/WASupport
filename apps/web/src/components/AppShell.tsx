@@ -3,7 +3,7 @@ import { useAuth } from '../lib/auth';
 import { ROLE_LABEL } from '../lib/types';
 
 export default function AppShell() {
-  const { user, role, isStaff, isAdmin, isManager, signOut } = useAuth();
+  const { user, role, isStaff, isAdmin, isAvAdmin, isManager, signOut } = useAuth();
   const navigate = useNavigate();
 
   async function handleSignOut() {
@@ -55,6 +55,11 @@ export default function AppShell() {
                 Dashboard
               </NavLink>
             )}
+            {(isAvAdmin || isAdmin) && (
+              <NavLink to="/admin/av" className={linkClass}>
+                AV Admin
+              </NavLink>
+            )}
             {isAdmin && (
               <NavLink to="/admin/users" className={linkClass}>
                 Users
@@ -73,6 +78,11 @@ export default function AppShell() {
             {isManager && (
               <NavLink to="/admin/notifications" className={linkClass}>
                 Notifications
+              </NavLink>
+            )}
+            {isAdmin && (
+              <NavLink to="/admin/import" className={linkClass}>
+                Import
               </NavLink>
             )}
             <NavLink to="/status" className={linkClass}>

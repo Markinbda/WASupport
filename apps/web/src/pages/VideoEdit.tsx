@@ -12,6 +12,30 @@ import {
   type VideoTag,
 } from '../lib/videos';
 
+type ThumbnailResult = {
+  id: string;
+  title: string;
+  creator: string | null;
+  thumbnailUrl: string;
+  sourceUrl: string | null;
+  license: string;
+};
+
+const THUMBNAIL_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+const MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024;
+
+function uploadedThumbnailPath(url: string | null | undefined) {
+  if (!url) return null;
+  const marker = '/storage/v1/object/public/video-thumbnails/';
+  try {
+    const path = new URL(url).pathname;
+    const markerIndex = path.indexOf(marker);
+    return markerIndex >= 0 ? decodeURIComponent(path.slice(markerIndex + marker.length)) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function VideoEdit() {
   const { id } = useParams<{ id?: string }>();
   const isNew = !id;
@@ -25,6 +49,12 @@ export default function VideoEdit() {
   const [tags, setTags] = useState<VideoTag[]>([]);
   const [status, setStatus] = useState<VideoStatus>('draft');
   const [thumbnailOverride, setThumbnailOverride] = useState('');
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailFilePreview, setThumbnailFilePreview] = useState('');
+  const [thumbnailQuery, setThumbnailQuery] = useState('');
+  const [thumbnailResults, setThumbnailResults] = useState<ThumbnailResult[]>([]);
+  const [thumbnailSearchPending, setThumbnailSearchPending] = useState(false);
+  const [thumbnailSearchError, setThumbnailSearchError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { data: existing, isLoading } = useQuery({
@@ -55,12 +85,72 @@ export default function VideoEdit() {
     }
   }, [existing]);
 
+  useEffect(() => {
+    if (!thumbnailFile) {
+      setThumbnailFilePreview('');
+      return;
+    }
+    const objectUrl = URL.createObjectURL(thumbnailFile);
+    setThumbnailFilePreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [thumbnailFile]);
+
   const detected = useMemo(() => detectProvider(url), [url]);
   const previewEmbed = detected.embedUrl;
-  const previewThumb = thumbnailOverride.trim() || detected.thumbnailUrl;
+  const previewThumb = thumbnailFilePreview || thumbnailOverride.trim() || detected.thumbnailUrl;
 
   const toggleTag = (t: VideoTag) =>
     setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+
+  async function searchThumbnails(query: string) {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 2 || !supabase) {
+      setThumbnailSearchError('Enter at least two characters to search.');
+      return;
+    }
+
+    setThumbnailQuery(trimmedQuery);
+    setThumbnailSearchPending(true);
+    setThumbnailSearchError(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Your session has expired. Sign in again to search.');
+
+      const response = await fetch(`/api/video-thumbnail-search?q=${encodeURIComponent(trimmedQuery)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        results?: ThumbnailResult[];
+        error?: string;
+      };
+      if (!response.ok) throw new Error(body.error || `Image search failed with HTTP ${response.status}`);
+      setThumbnailResults(body.results ?? []);
+    } catch (caught) {
+      setThumbnailResults([]);
+      setThumbnailSearchError(caught instanceof Error ? caught.message : 'Image search failed.');
+    } finally {
+      setThumbnailSearchPending(false);
+    }
+  }
+
+  function titleAndDescriptionQuery() {
+    return [title.trim(), description.trim()].filter(Boolean).join(' ').slice(0, 300);
+  }
+
+  function chooseThumbnailFile(file: File | null) {
+    if (!file) return;
+    if (!THUMBNAIL_TYPES.includes(file.type)) {
+      setError('Thumbnail must be a PNG, JPEG, or WebP image.');
+      return;
+    }
+    if (file.size > MAX_THUMBNAIL_BYTES) {
+      setError('Thumbnail must be 5 MB or smaller.');
+      return;
+    }
+    setError(null);
+    setThumbnailFile(file);
+  }
 
   const save = useMutation({
     mutationFn: async () => {
@@ -68,30 +158,57 @@ export default function VideoEdit() {
       if (!title.trim()) throw new Error('Title is required.');
       if (!url.trim()) throw new Error('Video URL is required.');
 
+      let thumbnailUrl = thumbnailOverride.trim() || detected.thumbnailUrl;
+      let uploadedPath: string | null = null;
+      if (thumbnailFile) {
+        if (!user) throw new Error('Sign in again before uploading a thumbnail.');
+        const extension = (thumbnailFile.name.split('.').pop() || 'jpg').toLowerCase().slice(0, 8);
+        uploadedPath = `videos/${user.id}/${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from('video-thumbnails')
+          .upload(uploadedPath, thumbnailFile, {
+            contentType: thumbnailFile.type,
+            upsert: false,
+          });
+        if (uploadError) throw uploadError;
+        thumbnailUrl = supabase.storage.from('video-thumbnails').getPublicUrl(uploadedPath).data.publicUrl;
+      }
+
       const row = {
         title: title.trim(),
         description: description.trim() || null,
         url: url.trim(),
         provider: detected.provider,
         provider_video_id: detected.videoId,
-        thumbnail_url: thumbnailOverride.trim() || detected.thumbnailUrl,
+        thumbnail_url: thumbnailUrl,
         tags,
         status,
         author_id: existing?.author_id ?? user?.id ?? null,
       };
 
-      if (isNew) {
-        const { data, error } = await supabase
-          .from('videos')
-          .insert(row)
-          .select('id')
-          .single();
+      try {
+        if (isNew) {
+          const { data, error } = await supabase
+            .from('videos')
+            .insert(row)
+            .select('id')
+            .single();
+          if (error) throw error;
+          return data.id as string;
+        }
+        const { error } = await supabase.from('videos').update(row).eq('id', id!);
         if (error) throw error;
-        return data.id as string;
+        const previousUpload = uploadedThumbnailPath(existing?.thumbnail_url);
+        if (previousUpload && existing?.thumbnail_url !== thumbnailUrl) {
+          await supabase.storage.from('video-thumbnails').remove([previousUpload]);
+        }
+        return id!;
+      } catch (saveError) {
+        if (uploadedPath) {
+          await supabase.storage.from('video-thumbnails').remove([uploadedPath]);
+        }
+        throw saveError;
       }
-      const { error } = await supabase.from('videos').update(row).eq('id', id!);
-      if (error) throw error;
-      return id!;
     },
     onSuccess: (newId) => {
       queryClient.invalidateQueries({ queryKey: ['videos'] });
@@ -106,6 +223,10 @@ export default function VideoEdit() {
       if (!supabase || !id) return;
       const { error } = await supabase.from('videos').delete().eq('id', id);
       if (error) throw error;
+      const previousUpload = uploadedThumbnailPath(existing?.thumbnail_url);
+      if (previousUpload) {
+        await supabase.storage.from('video-thumbnails').remove([previousUpload]);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['videos'] });
@@ -208,14 +329,152 @@ export default function VideoEdit() {
         </div>
 
         <div>
-          <label className="label" htmlFor="thumb">Thumbnail URL override (optional)</label>
+          <label className="label" htmlFor="thumb">Thumbnail</label>
           <input
             id="thumb"
             value={thumbnailOverride}
-            onChange={(e) => setThumbnailOverride(e.target.value)}
+            onChange={(e) => {
+              setThumbnailOverride(e.target.value);
+              setThumbnailFile(null);
+            }}
             className="field w-full"
             placeholder="Leave blank to auto-detect from YouTube"
           />
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <label className="btn-ghost cursor-pointer px-4 py-2 text-xs">
+              Upload image
+              <input
+                type="file"
+                accept={THUMBNAIL_TYPES.join(',')}
+                className="sr-only"
+                onChange={(e) => {
+                  chooseThumbnailFile(e.target.files?.[0] ?? null);
+                  e.currentTarget.value = '';
+                }}
+              />
+            </label>
+            {thumbnailFile && (
+              <>
+                <span className="max-w-72 truncate text-xs text-slate-600">
+                  {thumbnailFile.name} ({(thumbnailFile.size / 1024 / 1024).toFixed(1)} MB)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setThumbnailFile(null)}
+                  className="text-xs font-medium text-rose-600 hover:underline"
+                >
+                  Remove upload
+                </button>
+              </>
+            )}
+          </div>
+          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-52 flex-1">
+                <label className="field-label" htmlFor="thumbnail-search">Search images</label>
+                <input
+                  id="thumbnail-search"
+                  value={thumbnailQuery}
+                  onChange={(e) => setThumbnailQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void searchThumbnails(thumbnailQuery);
+                    }
+                  }}
+                  className="field-sm w-full"
+                  placeholder="Describe the image you need"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void searchThumbnails(thumbnailQuery)}
+                disabled={thumbnailSearchPending || thumbnailQuery.trim().length < 2}
+                className="btn-primary px-4 py-2"
+              >
+                {thumbnailSearchPending ? 'Searching…' : 'Search'}
+              </button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void searchThumbnails(title)}
+                disabled={thumbnailSearchPending || title.trim().length < 2}
+                className="btn-ghost px-3 py-2 text-xs"
+              >
+                Suggest from title
+              </button>
+              <button
+                type="button"
+                onClick={() => void searchThumbnails(titleAndDescriptionQuery())}
+                disabled={thumbnailSearchPending || titleAndDescriptionQuery().length < 2}
+                className="btn-ghost px-3 py-2 text-xs"
+              >
+                Use title + description
+              </button>
+              {thumbnailOverride && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setThumbnailFile(null);
+                    setThumbnailOverride('');
+                  }}
+                  className="px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900"
+                >
+                  Use video thumbnail
+                </button>
+              )}
+            </div>
+
+            {thumbnailSearchError && <p className="mt-3 alert-error">{thumbnailSearchError}</p>}
+            {!thumbnailSearchPending && !thumbnailSearchError && thumbnailResults.length === 0 && thumbnailQuery && (
+              <p className="mt-3 text-xs text-slate-500">No image results yet. Try a broader description.</p>
+            )}
+
+            {thumbnailResults.length > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {thumbnailResults.map((image) => {
+                  const selected = thumbnailOverride === image.thumbnailUrl;
+                  return (
+                    <button
+                      key={image.id}
+                      type="button"
+                      onClick={() => {
+                        setThumbnailFile(null);
+                        setThumbnailOverride(image.thumbnailUrl);
+                      }}
+                      className={`overflow-hidden rounded-md border-2 bg-slate-50 text-left transition ${
+                        selected
+                          ? 'border-brand-amber ring-2 ring-brand-amber/30'
+                          : 'border-transparent hover:border-slate-400'
+                      }`}
+                      aria-pressed={selected}
+                      title={`Use ${image.title}`}
+                    >
+                      <div className="aspect-video bg-slate-100">
+                        <img
+                          src={image.thumbnailUrl}
+                          alt={image.title}
+                          loading="lazy"
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                      <div className="h-14 px-2 py-1.5">
+                        <div className="line-clamp-1 text-xs font-medium text-slate-800">{image.title}</div>
+                        <div className="line-clamp-1 text-[10px] text-slate-500">
+                          {[image.creator, image.license].filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <p className="mt-3 text-[11px] text-slate-500">
+              Search results are CC0 or public-domain images provided by Openverse.
+            </p>
+          </div>
         </div>
 
         <div>
@@ -246,7 +505,7 @@ export default function VideoEdit() {
               </div>
               {previewThumb && (
                 <div className="aspect-video overflow-hidden rounded-md border border-slate-200 bg-slate-100">
-                  <img src={previewThumb} alt="" className="h-full w-full object-cover" />
+                  <img src={previewThumb} alt="" className="h-full w-full object-contain" />
                 </div>
               )}
             </div>
